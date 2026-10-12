@@ -1,0 +1,2 @@
+export { homeRoutes } from "./routes";
+

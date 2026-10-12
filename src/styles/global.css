@@ -1,0 +1,20 @@
+/*
+ * Estilos globais mínimos. Cores, espaçamentos e fontes vêm dos tokens do ronin-ui
+ * (`--color-*`, `--space-*`, `--text-*`...). Para customizar, sobrescreva os tokens aqui.
+ */
+
+html,
+body,
+#root {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-sans);
+}
+
+a {
+	color: inherit;
+}
+
