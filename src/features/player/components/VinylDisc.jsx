@@ -16,3 +16,4 @@ export const VinylDisc = ({ girando }) => {
 		</div>
 	);
 };
+

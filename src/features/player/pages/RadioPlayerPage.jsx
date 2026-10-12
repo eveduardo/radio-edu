@@ -1,7 +1,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Badge, Button } from "@jposawa/ronin-ui";
-import { useRadioPlayer } from "../hooks/useRadioPlayer";
+import { useRadioPlayerContext } from "../context/RadioPlayerContext";
 import { VinylDisc } from "../components/VinylDisc";
 import { HorizontalVuMeter } from "../components/HorizontalVuMeter";
 import { SongRequestModal } from "../components/SongRequestModal";
@@ -25,9 +25,6 @@ const RadioPlayerPage = () => {
 		volumeMaster,
 		recolhido,
 		playerRef,
-		playerHoraRef,
-		playerVozRef,
-		playerVinhetaRef,
 		audioCtxRef,
 		analyserRef,
 		dataArrayRef,
@@ -35,9 +32,7 @@ const RadioPlayerPage = () => {
 		mutarOuRestaurar,
 		alternarReproducao,
 		alternarExpansaoCard,
-		handleTrackEnded,
-		handleTrackError,
-	} = useRadioPlayer();
+	} = useRadioPlayerContext();
 
 	return (
 		<div className={styles.radioScreen}>
@@ -136,17 +131,6 @@ const RadioPlayerPage = () => {
 				isOpen={modalPedidoAberto}
 				onClose={() => setModalPedidoAberto(false)}
 			/>
-
-			<audio
-				ref={playerRef}
-				preload="auto"
-				crossOrigin="anonymous"
-				onEnded={handleTrackEnded}
-				onError={handleTrackError}
-			/>
-			<audio ref={playerHoraRef} preload="auto" />
-			<audio ref={playerVozRef} preload="auto" />
-			<audio ref={playerVinhetaRef} preload="auto" />
 		</div>
 	);
 };

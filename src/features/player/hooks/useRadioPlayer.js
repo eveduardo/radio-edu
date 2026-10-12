@@ -44,6 +44,7 @@ export const useRadioPlayer = () => {
 	const ultimaVinhetaTocadaRef = useRef(0);
 	const primeiraCargaFirebaseRef = useRef(true);
 	const ultimaTrocaForcadaRef = useRef(0);
+	const ultimaAtualizacaoProgRef = useRef(0);
 	const emTransicaoSuaveRef = useRef(false);
 	const wakeLockRef = useRef(null);
 
@@ -191,15 +192,25 @@ export const useRadioPlayer = () => {
 		[aplicarVolumesMesa],
 	);
 
+	/**
+	 * Sincroniza o player com o estado do servidor (`radio_sync.php`).
+	 *
+	 * Importante:
+	 * - `forcarProxima` só deve ser `true` quando a faixa realmente terminou no cliente
+	 *   e o servidor ainda não virou a faixa no `no_ar.json`.
+	 * - Quando o locutor dispara uma transição (`forcar_troca` via Firebase), o locutor
+	 *   JÁ virou a faixa no servidor, portanto o ouvinte deve buscar com `forcarProxima = false`
+	 *   e `recarregarAudio = true` para carregar exatamente a faixa que o locutor colocou no ar.
+	 */
 	const sincronizarRadio = useCallback(
-		async (forcarProxima = false) => {
+		async (forcarProxima = false, { recarregarAudio = false } = {}) => {
 			try {
 				const data = await fetchRadioSync({ forcarProxima });
 
 				if (data.error) {
 					setTituloMusica(data.error);
 					setNomeOuvinte("");
-					return;
+					return data;
 				}
 
 				const nomeOriginal = data.faixa_atual?.nome || "";
@@ -229,6 +240,7 @@ export const useRadioPlayer = () => {
 				if (
 					player &&
 					(forcarProxima ||
+						recarregarAudio ||
 						!urlFaixaAtualRef.current ||
 						urlFaixaAtualRef.current !== novaUrl)
 				) {
@@ -240,7 +252,7 @@ export const useRadioPlayer = () => {
 							.play()
 							.then(() => {
 								inicializarAudioContext();
-								if (!forcarProxima && offsetExato > 0) {
+								if (!forcarProxima && offsetExato > 2) {
 									player.currentTime = offsetExato;
 								}
 								setStatusTexto("Transmitindo em tempo real");
@@ -265,8 +277,11 @@ export const useRadioPlayer = () => {
 				) {
 					tocarHoraCerta(data.hora_certa.arquivo, data.hora_certa.horario);
 				}
+
+				return data;
 			} catch {
 				setStatusTexto("Erro ao sincronizar rádio");
+				return null;
 			}
 		},
 		[inicializarAudioContext, tocarHoraCerta],
@@ -297,7 +312,8 @@ export const useRadioPlayer = () => {
 			}
 		}
 
-		await sincronizarRadio(true);
+		// Busca a faixa que o locutor JÁ virou no servidor (sem passar forcar_proxima=1!)
+		await sincronizarRadio(false, { recarregarAudio: true });
 
 		for (let i = 1; i <= passos; i++) {
 			await new Promise((r) => setTimeout(r, 80));
@@ -386,7 +402,7 @@ export const useRadioPlayer = () => {
 		sincronizarRadio(false);
 
 		const interval = setInterval(() => {
-			if (estaTocandoRef.current) {
+			if (estaTocandoRef.current && !emTransicaoSuaveRef.current) {
 				sincronizarRadio(false);
 			}
 		}, 30000);
@@ -441,6 +457,9 @@ export const useRadioPlayer = () => {
 				if (dados.forcar_troca) {
 					ultimaTrocaForcadaRef.current = dados.forcar_troca;
 				}
+				if (dados.atualizacao_programacao) {
+					ultimaAtualizacaoProgRef.current = dados.atualizacao_programacao;
+				}
 				return;
 			}
 
@@ -451,6 +470,18 @@ export const useRadioPlayer = () => {
 				ultimaTrocaForcadaRef.current = dados.forcar_troca;
 				if (estaTocandoRef.current) {
 					executarCrossfadeOuvinte();
+				} else {
+					sincronizarRadio(false);
+				}
+			}
+
+			if (
+				dados.atualizacao_programacao &&
+				dados.atualizacao_programacao > ultimaAtualizacaoProgRef.current
+			) {
+				ultimaAtualizacaoProgRef.current = dados.atualizacao_programacao;
+				if (!emTransicaoSuaveRef.current) {
+					sincronizarRadio(false);
 				}
 			}
 
@@ -491,7 +522,12 @@ export const useRadioPlayer = () => {
 		});
 
 		return () => unsubscribe();
-	}, [aplicarVolumesMesa, executarCrossfadeOuvinte, tocarProximoBlocoVoz]);
+	}, [
+		aplicarVolumesMesa,
+		executarCrossfadeOuvinte,
+		sincronizarRadio,
+		tocarProximoBlocoVoz,
+	]);
 
 	// WakeLock para manter a tela ativa enquanto a rádio toca
 	useEffect(() => {
@@ -520,14 +556,25 @@ export const useRadioPlayer = () => {
 		};
 	}, [estaTocando]);
 
-	const handleTrackEnded = useCallback(() => {
+	const handleTrackEnded = useCallback(async () => {
+		if (emTransicaoSuaveRef.current) return;
 		setStatusTexto("Carregando próxima música...");
-		sincronizarRadio(true);
+
+		const urlAnterior = urlFaixaAtualRef.current;
+		// Primeiro consulta sem forçar para verificar se o servidor já virou a música
+		const data = await sincronizarRadio(false);
+		const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
+
+		// Só força a virada no servidor se ele ainda estiver preso na música que acabou de terminar
+		if (!urlServidor || urlServidor === urlAnterior) {
+			await sincronizarRadio(true, { recarregarAudio: true });
+		}
 	}, [sincronizarRadio]);
 
 	const handleTrackError = useCallback(() => {
+		if (emTransicaoSuaveRef.current) return;
 		setStatusTexto("Reconectando áudio...");
-		setTimeout(() => sincronizarRadio(true), 2000);
+		setTimeout(() => sincronizarRadio(false, { recarregarAudio: true }), 2000);
 	}, [sincronizarRadio]);
 
 	return {

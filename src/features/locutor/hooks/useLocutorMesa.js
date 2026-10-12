@@ -34,6 +34,13 @@ export const useLocutorMesa = () => {
 	faderMicRef.current = faderMic;
 	const faderMusicaRef = useRef(faderMusica);
 	faderMusicaRef.current = faderMusica;
+	const transicaoEmAndamentoRef = useRef(transicaoEmAndamento);
+	transicaoEmAndamentoRef.current = transicaoEmAndamento;
+	const pedidosRef = useRef(pedidos);
+	pedidosRef.current = pedidos;
+
+	const proximaNomeServidorRef = useRef("");
+	const temAgendamentoExplicitoRef = useRef(false);
 
 	const streamMicRef = useRef(null);
 	const micAudioCtxRef = useRef(null);
@@ -265,24 +272,28 @@ export const useLocutorMesa = () => {
 		};
 	}, [desligarMicrofone]);
 
+	const aplicarDadosSyncNaMesa = useCallback((data) => {
+		if (data?.faixa_atual) {
+			setMusicaAtual(data.faixa_atual.nome || "Sem título");
+			const nomeProx = data.proxima_faixa?.nome || "";
+			proximaNomeServidorRef.current = nomeProx;
+			setProximaAtual(`A seguir: ${nomeProx || "--"}`);
+			duracaoAtualRef.current = data.faixa_atual.duracao || 180;
+			offsetAtualRef.current = data.offset_segundos || 0;
+			setTempoRestanteSeg(
+				Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
+			);
+		}
+	}, []);
+
 	const monitorarMusicaNoAr = useCallback(async () => {
 		try {
 			const data = await fetchRadioSync();
-			if (data?.faixa_atual) {
-				setMusicaAtual(data.faixa_atual.nome || "Sem título");
-				setProximaAtual(
-					`A seguir: ${data.proxima_faixa?.nome ? data.proxima_faixa.nome : "--"}`,
-				);
-				duracaoAtualRef.current = data.faixa_atual.duracao || 180;
-				offsetAtualRef.current = data.offset_segundos || 0;
-				setTempoRestanteSeg(
-					Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
-				);
-			}
+			aplicarDadosSyncNaMesa(data);
 		} catch {
 			// Ignora erro temporário de rede
 		}
-	}, []);
+	}, [aplicarDadosSyncNaMesa]);
 
 	useEffect(() => {
 		monitorarMusicaNoAr();
@@ -308,20 +319,40 @@ export const useLocutorMesa = () => {
 	}, [monitorarMusicaNoAr]);
 
 	const transicaoSuaveProxima = useCallback(async () => {
-		if (transicaoEmAndamento) return;
+		if (transicaoEmAndamentoRef.current) return;
+		transicaoEmAndamentoRef.current = true;
 		setTransicaoEmAndamento(true);
 
 		const volInicial = faderMusicaRef.current;
 
 		try {
-			await fetchRadioSync({ forcarProxima: true });
-			await monitorarMusicaNoAr();
+			// Se não houve agendamento manual nem pedido pendente, fixa a faixa exibida em "A seguir"
+			// antes de virar a faixa para que o servidor não faça um sorteio aleatório diferente do visor
+			const haPedidoPendente = pedidosRef.current.some((p) => !p.tocado);
+			const nomeProximaVisor = proximaNomeServidorRef.current
+				.replace(/\s*\([^)]+\)\s*$/, "")
+				.trim();
+
+			if (
+				!temAgendamentoExplicitoRef.current &&
+				!haPedidoPendente &&
+				nomeProximaVisor
+			) {
+				await scheduleNextTrack(nomeProximaVisor).catch(() => {});
+			}
+
+			// 1. Vira a faixa no servidor e atualiza o visor da mesa
+			const novoEstado = await fetchRadioSync({ forcarProxima: true });
+			temAgendamentoExplicitoRef.current = false;
+			aplicarDadosSyncNaMesa(novoEstado);
 		} catch {
 			// ignore
 		}
 
-		updateMesa({ forcar_troca: Date.now() }).catch(() => {});
+		// 2. Notifica todos os ouvintes via Firebase para fazerem o crossfade para a nova faixa do servidor
+		await updateMesa({ forcar_troca: Date.now() }).catch(() => {});
 
+		// 3. Anima o fader na interface do locutor
 		const passos = 6;
 		const decremento = volInicial / passos;
 
@@ -344,8 +375,9 @@ export const useLocutorMesa = () => {
 		}
 
 		sincronizarMesaFirebase(true);
+		transicaoEmAndamentoRef.current = false;
 		setTransicaoEmAndamento(false);
-	}, [monitorarMusicaNoAr, sincronizarMesaFirebase, transicaoEmAndamento]);
+	}, [aplicarDadosSyncNaMesa, sincronizarMesaFirebase]);
 
 	const carregarPedidos = useCallback(async () => {
 		try {
@@ -405,7 +437,7 @@ export const useLocutorMesa = () => {
 	}, [carregarAcervo]);
 
 	const atenderPedido = useCallback(
-		async (pedido) => {
+		async (pedido, tocarAgora = false) => {
 			const arquivoMusica = pedido.arquivo || "";
 			const tituloMusica = pedido.titulo || "";
 			const nomeOuvinte = pedido.nome || "Ouvinte";
@@ -426,19 +458,25 @@ export const useLocutorMesa = () => {
 			try {
 				if (identificador) {
 					await scheduleNextTrack(identificador);
+					temAgendamentoExplicitoRef.current = true;
 				}
 				await markRequestAsPlayed(pedido.chave_linha);
-
-				setProximaAtual(
-					`A seguir: ${tituloMusica} (Pedido de ${nomeOuvinte})`,
-				);
-				setAvisoModal({
-					icone: "✅",
-					titulo: "Pedido Agendado",
-					mensagem: `Música agendada a seguir:\n"${tituloMusica}"\nPedido por: ${nomeOuvinte}`,
-				});
 				carregarPedidos();
-				monitorarMusicaNoAr();
+
+				if (tocarAgora) {
+					await transicaoSuaveProxima();
+				} else {
+					const textoProx = `${tituloMusica} (${nomeOuvinte})`;
+					proximaNomeServidorRef.current = textoProx;
+					setProximaAtual(`A seguir: ${textoProx}`);
+					updateMesa({ atualizacao_programacao: Date.now() }).catch(() => {});
+					setAvisoModal({
+						icone: "✅",
+						titulo: "Pedido Agendado",
+						mensagem: `Música agendada a seguir:\n"${tituloMusica}"\nPedido por: ${nomeOuvinte}`,
+					});
+					monitorarMusicaNoAr();
+				}
 			} catch {
 				setAvisoModal({
 					icone: "⚠️",
@@ -447,7 +485,7 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[carregarPedidos, monitorarMusicaNoAr],
+		[carregarPedidos, monitorarMusicaNoAr, transicaoSuaveProxima],
 	);
 
 	const solicitarDescartePedido = useCallback(
@@ -471,20 +509,28 @@ export const useLocutorMesa = () => {
 	);
 
 	const agendarFaixaAcervo = useCallback(
-		async (faixa) => {
+		async (faixa, tocarAgora = false) => {
 			const idParaEnviar = faixa.id || faixa.arquivo || faixa.url || "";
 			const nomeFaixa = faixa.nome || "Música";
 
 			try {
 				const data = await scheduleNextTrack(idParaEnviar);
 				if (data?.sucesso) {
-					setProximaAtual(`A seguir (Agendada): ${nomeFaixa}`);
-					setAvisoModal({
-						icone: "✅",
-						titulo: "Faixa Agendada",
-						mensagem: `Próxima música agendada com sucesso:\n"${nomeFaixa}"`,
-					});
-					setTimeout(monitorarMusicaNoAr, 500);
+					temAgendamentoExplicitoRef.current = true;
+					proximaNomeServidorRef.current = data.proxima || nomeFaixa;
+
+					if (tocarAgora) {
+						await transicaoSuaveProxima();
+					} else {
+						setProximaAtual(`A seguir (Agendada): ${nomeFaixa}`);
+						updateMesa({ atualizacao_programacao: Date.now() }).catch(() => {});
+						setAvisoModal({
+							icone: "✅",
+							titulo: "Faixa Agendada",
+							mensagem: `Próxima música agendada com sucesso:\n"${nomeFaixa}"`,
+						});
+						setTimeout(monitorarMusicaNoAr, 500);
+					}
 				} else {
 					setAvisoModal({
 						icone: "⚠️",
@@ -500,7 +546,7 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[monitorarMusicaNoAr],
+		[monitorarMusicaNoAr, transicaoSuaveProxima],
 	);
 
 	const minutosRestantes = String(Math.floor(tempoRestanteSeg / 60)).padStart(

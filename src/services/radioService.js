@@ -34,11 +34,11 @@ export const fetchGenresCatalog = async () => {
 };
 
 /**
- * Força a reconstrução do `playlist_cache.json` a partir da pasta `/musicas/`.
+ * Força a reconstrução do `playlist_cache.json` a partir da pasta `/musicas/` (`atualizar_acervo.php`).
  */
 export const rebuildRadioCache = async () => {
-	const { data } = await api.get("/radio_sync.php", {
-		params: { gerar_cache: "1", t: Date.now() },
+	const { data } = await api.get("/atualizar_acervo.php", {
+		params: { t: Date.now() },
 	});
 	return data;
 };
@@ -67,7 +67,12 @@ export const scheduleNextTrack = async (trackIdentifier) => {
  * @param {string} payload.nome
  * @param {string} [payload.recado]
  */
-export const submitSongRequest = async ({ arquivo, titulo, nome, recado = "" }) => {
+export const submitSongRequest = async ({
+	arquivo,
+	titulo,
+	nome,
+	recado = "",
+}) => {
 	const formData = new FormData();
 	formData.append("arquivo", arquivo);
 	formData.append("titulo", titulo);
@@ -97,7 +102,10 @@ export const markRequestAsPlayed = async (chaveLinha) => {
 	const formData = new FormData();
 	formData.append("chave_linha", chaveLinha);
 
-	const { data } = await api.post("/locutor.php?acao_pedidos=marcar_tocado", formData);
+	const { data } = await api.post(
+		"/locutor.php?acao_pedidos=marcar_tocado",
+		formData,
+	);
 	return data;
 };
 
@@ -110,7 +118,10 @@ export const removeListenerRequest = async (chaveLinha) => {
 	const formData = new FormData();
 	formData.append("chave_linha", chaveLinha);
 
-	const { data } = await api.post("/locutor.php?acao_pedidos=remover", formData);
+	const { data } = await api.post(
+		"/locutor.php?acao_pedidos=remover",
+		formData,
+	);
 	return data;
 };
 
@@ -120,7 +131,10 @@ export const removeListenerRequest = async (chaveLinha) => {
  * @param {Blob} audioBlob
  * @param {string} [password]
  */
-export const uploadVoiceChunk = async (audioBlob, password = ENV.locutorPassword) => {
+export const uploadVoiceChunk = async (
+	audioBlob,
+	password = ENV.locutorPassword,
+) => {
 	const formData = new FormData();
 	formData.append("acao", "enviar_audio");
 	formData.append("senha", password);

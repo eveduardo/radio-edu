@@ -204,14 +204,25 @@ const LocutorPage = () => {
 										{p.tocado ? (
 											<span className={styles.badgeTocado}>✔ Já Tocou</span>
 										) : (
-											<button
-												type="button"
-												className={styles.btnAtenderPedido}
-												title="Tocar esta a seguir"
-												onClick={() => atenderPedido(p)}
-											>
-												▶ Tocar
-											</button>
+											<>
+												<button
+													type="button"
+													className={styles.btnAtenderPedido}
+													title="Agendar como próxima faixa"
+													onClick={() => atenderPedido(p, false)}
+												>
+													▶ A Seguir
+												</button>
+												<button
+													type="button"
+													className={styles.btnFadeProxima}
+													title="Entrar no ar agora com crossfade"
+													disabled={transicaoEmAndamento}
+													onClick={() => atenderPedido(p, true)}
+												>
+													⏭ Agora
+												</button>
+											</>
 										)}
 										<button
 											type="button"
@@ -316,16 +327,29 @@ const LocutorPage = () => {
 									<span className={styles.itemMusicaTitulo}>
 										🎵 {faixa.nome}
 									</span>
-									<Button
-										intent="primary"
-										variant="filled"
-										onClick={() => {
-											setGeneroModalAtivo(null);
-											agendarFaixaAcervo(faixa);
-										}}
-									>
-										▶ Agendar
-									</Button>
+									<div className={styles.botoesAcaoPedido}>
+										<Button
+											intent="secondary"
+											variant="outline"
+											onClick={() => {
+												setGeneroModalAtivo(null);
+												agendarFaixaAcervo(faixa, false);
+											}}
+										>
+											▶ Agendar
+										</Button>
+										<Button
+											intent="primary"
+											variant="filled"
+											disabled={transicaoEmAndamento}
+											onClick={() => {
+												setGeneroModalAtivo(null);
+												agendarFaixaAcervo(faixa, true);
+											}}
+										>
+											⏭ Tocar Agora
+										</Button>
+									</div>
 								</div>
 							))
 						)}

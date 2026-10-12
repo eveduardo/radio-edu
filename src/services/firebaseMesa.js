@@ -40,3 +40,4 @@ export const subscribeToMesa = (callback) => {
 export const updateMesa = (partialState) => {
 	return update(mesaRef, partialState);
 };
+
