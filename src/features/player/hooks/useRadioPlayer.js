@@ -56,6 +56,54 @@ export const useRadioPlayer = () => {
 		ultimo_chunk: 0,
 	});
 
+	const aplicarVolumesMesa = useCallback(() => {
+		const estadoMesa = estadoMesaRef.current;
+		const volMaster = volumeMasterRef.current;
+
+		const volMusicaMesa =
+			estadoMesa && typeof estadoMesa.musica_volume === "number"
+				? estadoMesa.musica_volume
+				: 1.0;
+
+		const volMicMesa =
+			estadoMesa && typeof estadoMesa.mic_volume === "number"
+				? estadoMesa.mic_volume
+				: 1.0;
+
+		const volumeFinalMusica = Math.max(
+			0,
+			Math.min(1, volMaster * volMusicaMesa),
+		);
+
+		const ctx = audioCtxRef.current;
+		const gainNode = gainNodeMusicaRef.current;
+		const player = playerRef.current;
+
+		if (gainNode && ctx && ctx.state === "running") {
+			gainNode.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
+			if (player) {
+				player.volume = 1;
+			}
+		} else if (player) {
+			player.volume = volumeFinalMusica;
+		}
+
+		if (playerVozRef.current) {
+			try {
+				playerVozRef.current.volume = Math.max(
+					0,
+					Math.min(1, volMaster * volMicMesa),
+				);
+			} catch {
+				// Ignora erro em dispositivos com volume fixo
+			}
+		}
+	}, []);
+
+	/**
+	 * Deve ser chamado apenas dentro de eventos de interação do usuário (click/touchstart/keydown)
+	 * para garantir que o AudioContext nunca seja criado em estado "suspended" (o que silenciaria o <audio>).
+	 */
 	const inicializarAudioContext = useCallback(() => {
 		try {
 			const player = playerRef.current;
@@ -87,51 +135,12 @@ export const useRadioPlayer = () => {
 			if (audioCtxRef.current.state === "suspended") {
 				audioCtxRef.current.resume().catch(() => {});
 			}
+
+			aplicarVolumesMesa();
 		} catch {
 			// Fallback silencioso caso o navegador bloqueie Web Audio
 		}
-	}, []);
-
-	const aplicarVolumesMesa = useCallback(() => {
-		const estadoMesa = estadoMesaRef.current;
-		const volMaster = volumeMasterRef.current;
-
-		const volMusicaMesa =
-			estadoMesa && typeof estadoMesa.musica_volume === "number"
-				? estadoMesa.musica_volume
-				: 1.0;
-
-		const volMicMesa =
-			estadoMesa && typeof estadoMesa.mic_volume === "number"
-				? estadoMesa.mic_volume
-				: 1.0;
-
-		const volumeFinalMusica = Math.max(
-			0,
-			Math.min(1, volMaster * volMusicaMesa),
-		);
-
-		const ctx = audioCtxRef.current;
-		const gainNode = gainNodeMusicaRef.current;
-		const player = playerRef.current;
-
-		if (gainNode && ctx && ctx.state === "running") {
-			gainNode.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
-		} else if (player) {
-			player.volume = volumeFinalMusica;
-		}
-
-		if (playerVozRef.current) {
-			try {
-				playerVozRef.current.volume = Math.max(
-					0,
-					Math.min(1, volMaster * volMicMesa),
-				);
-			} catch {
-				// Ignora erro em dispositivos com volume fixo
-			}
-		}
-	}, []);
+	}, [aplicarVolumesMesa]);
 
 	const tocarProximoBlocoVoz = useCallback(() => {
 		const playerVoz = playerVozRef.current;
@@ -179,6 +188,8 @@ export const useRadioPlayer = () => {
 					0.2 * volumeMasterRef.current,
 					ctx.currentTime,
 				);
+			} else if (playerRef.current) {
+				playerRef.current.volume = 0.2 * volumeMasterRef.current;
 			}
 
 			playerHora.src = resolveRadioAssetUrl(arquivo);
@@ -192,23 +203,13 @@ export const useRadioPlayer = () => {
 		[aplicarVolumesMesa],
 	);
 
-	/**
-	 * Sincroniza o player com o estado do servidor (`radio_sync.php`).
-	 *
-	 * Importante:
-	 * - `forcarProxima` só deve ser `true` quando a faixa realmente terminou no cliente
-	 *   e o servidor ainda não virou a faixa no `no_ar.json`.
-	 * - Quando o locutor dispara uma transição (`forcar_troca` via Firebase), o locutor
-	 *   JÁ virou a faixa no servidor, portanto o ouvinte deve buscar com `forcarProxima = false`
-	 *   e `recarregarAudio = true` para carregar exatamente a faixa que o locutor colocou no ar.
-	 */
 	const sincronizarRadio = useCallback(
 		async (forcarProxima = false, { recarregarAudio = false } = {}) => {
 			try {
 				const data = await fetchRadioSync({ forcarProxima });
 
-				if (data.error) {
-					setTituloMusica(data.error);
+				if (!data || data.error) {
+					setTituloMusica(data?.error || "Sem programação");
 					setNomeOuvinte("");
 					return data;
 				}
@@ -234,6 +235,8 @@ export const useRadioPlayer = () => {
 				setProximaFaixa(`A seguir: ${data.proxima_faixa?.nome || "--"}`);
 
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual?.url || "");
+				if (!novaUrl) return data;
+
 				const offsetExato = Math.max(0, data.offset_segundos || 0);
 				const player = playerRef.current;
 
@@ -246,27 +249,40 @@ export const useRadioPlayer = () => {
 				) {
 					urlFaixaAtualRef.current = novaUrl;
 					player.src = novaUrl;
+					aplicarVolumesMesa();
 
 					if (estaTocandoRef.current) {
+						if (audioCtxRef.current?.state === "suspended") {
+							audioCtxRef.current.resume().catch(() => {});
+						}
+
 						player
 							.play()
 							.then(() => {
-								inicializarAudioContext();
 								if (!forcarProxima && offsetExato > 2) {
-									player.currentTime = offsetExato;
+									try {
+										player.currentTime = offsetExato;
+									} catch {
+										// ignore seek error before metadata
+									}
 								}
 								setStatusTexto("Transmitindo em tempo real");
 							})
 							.catch(() => {
-								setStatusTexto("Toque em qualquer lugar para ouvir");
+								setStatusTexto("Toque no play ou na tela para ouvir");
 							});
 					}
 				} else if (
 					player &&
 					estaTocandoRef.current &&
+					!player.paused &&
 					Math.abs(player.currentTime - offsetExato) > 4
 				) {
-					player.currentTime = offsetExato;
+					try {
+						player.currentTime = offsetExato;
+					} catch {
+						// ignore
+					}
 				}
 
 				const minutoAgora = new Date().getMinutes();
@@ -284,56 +300,59 @@ export const useRadioPlayer = () => {
 				return null;
 			}
 		},
-		[inicializarAudioContext, tocarHoraCerta],
+		[aplicarVolumesMesa, tocarHoraCerta],
 	);
 
 	const executarCrossfadeOuvinte = useCallback(async () => {
 		if (emTransicaoSuaveRef.current) return;
 		emTransicaoSuaveRef.current = true;
 
-		const passos = 7;
-		const tempoPasso = 100;
-		const ctx = audioCtxRef.current;
-		const gainNode = gainNodeMusicaRef.current;
-		const player = playerRef.current;
+		try {
+			const passos = 7;
+			const tempoPasso = 90;
+			const ctx = audioCtxRef.current;
+			const gainNode = gainNodeMusicaRef.current;
+			const player = playerRef.current;
 
-		const volAtual =
-			gainNode && ctx && ctx.state === "running"
-				? gainNode.gain.value
-				: player?.volume ?? 1;
+			const volAtual =
+				gainNode && ctx && ctx.state === "running"
+					? gainNode.gain.value
+					: player?.volume ?? 1;
 
-		for (let i = 1; i <= passos; i++) {
-			await new Promise((r) => setTimeout(r, tempoPasso));
-			const v = Math.max(0, volAtual - (volAtual / passos) * i);
-			if (gainNode && ctx && ctx.state === "running") {
-				gainNode.gain.setValueAtTime(v, ctx.currentTime);
-			} else if (player) {
-				player.volume = v;
+			for (let i = 1; i <= passos; i++) {
+				await new Promise((r) => setTimeout(r, tempoPasso));
+				const v = Math.max(0, volAtual - (volAtual / passos) * i);
+				if (gainNode && ctx && ctx.state === "running") {
+					gainNode.gain.setValueAtTime(v, ctx.currentTime);
+				} else if (player) {
+					player.volume = v;
+				}
 			}
-		}
 
-		// Busca a faixa que o locutor JÁ virou no servidor (sem passar forcar_proxima=1!)
-		await sincronizarRadio(false, { recarregarAudio: true });
+			// Carrega a nova música que o locutor já virou no servidor
+			await sincronizarRadio(false, { recarregarAudio: true });
 
-		for (let i = 1; i <= passos; i++) {
-			await new Promise((r) => setTimeout(r, 80));
-			const volAlvo = Math.max(
-				0,
-				Math.min(
-					1,
-					volumeMasterRef.current * (estadoMesaRef.current.musica_volume ?? 1.0),
-				),
-			);
-			const v = Math.min(volAlvo, (volAlvo / passos) * i);
-			if (gainNode && ctx && ctx.state === "running") {
-				gainNode.gain.setValueAtTime(v, ctx.currentTime);
-			} else if (player) {
-				player.volume = v;
+			for (let i = 1; i <= passos; i++) {
+				await new Promise((r) => setTimeout(r, 80));
+				const volAlvo = Math.max(
+					0,
+					Math.min(
+						1,
+						volumeMasterRef.current *
+							(estadoMesaRef.current.musica_volume ?? 1.0),
+					),
+				);
+				const v = Math.min(volAlvo, (volAlvo / passos) * i);
+				if (gainNode && ctx && ctx.state === "running") {
+					gainNode.gain.setValueAtTime(v, ctx.currentTime);
+				} else if (player) {
+					player.volume = v;
+				}
 			}
+		} finally {
+			aplicarVolumesMesa();
+			emTransicaoSuaveRef.current = false;
 		}
-
-		aplicarVolumesMesa();
-		emTransicaoSuaveRef.current = false;
 	}, [aplicarVolumesMesa, sincronizarRadio]);
 
 	const ajustarVolume = useCallback(
@@ -363,10 +382,6 @@ export const useRadioPlayer = () => {
 			setEstaTocando(true);
 			setStatusTexto("Iniciando transmissão...");
 
-			playerVozRef.current?.play().catch(() => {});
-			playerHoraRef.current?.play().catch(() => {});
-			playerVinhetaRef.current?.play().catch(() => {});
-
 			aplicarVolumesMesa();
 
 			if (player?.src && player.src !== window.location.href) {
@@ -376,10 +391,10 @@ export const useRadioPlayer = () => {
 						setStatusTexto("Transmitindo em tempo real");
 					})
 					.catch(() => {
-						sincronizarRadio(false);
+						sincronizarRadio(false, { recarregarAudio: true });
 					});
 			} else {
-				sincronizarRadio(false);
+				sincronizarRadio(false, { recarregarAudio: true });
 			}
 		} else {
 			estaTocandoRef.current = false;
@@ -410,14 +425,10 @@ export const useRadioPlayer = () => {
 		return () => clearInterval(interval);
 	}, [sincronizarRadio]);
 
-	// Desbloqueio de áudio no primeiro toque/clique
+	// Desbloqueio de áudio em qualquer clique/toque quando o AudioContext ou player estiverem suspensos/pausados
 	useEffect(() => {
 		const desbloquear = () => {
 			inicializarAudioContext();
-			if (audioCtxRef.current?.state === "suspended") {
-				audioCtxRef.current.resume().catch(() => {});
-			}
-			aplicarVolumesMesa();
 			const player = playerRef.current;
 			if (estaTocandoRef.current && player?.paused && player.src) {
 				player
@@ -427,8 +438,6 @@ export const useRadioPlayer = () => {
 					})
 					.catch(() => {});
 			}
-			document.removeEventListener("click", desbloquear);
-			document.removeEventListener("touchstart", desbloquear);
 		};
 
 		document.addEventListener("click", desbloquear);
@@ -438,7 +447,7 @@ export const useRadioPlayer = () => {
 			document.removeEventListener("click", desbloquear);
 			document.removeEventListener("touchstart", desbloquear);
 		};
-	}, [aplicarVolumesMesa, inicializarAudioContext]);
+	}, [inicializarAudioContext]);
 
 	// Assinatura em tempo real do Firebase (nó `mesa`)
 	useEffect(() => {
@@ -561,11 +570,9 @@ export const useRadioPlayer = () => {
 		setStatusTexto("Carregando próxima música...");
 
 		const urlAnterior = urlFaixaAtualRef.current;
-		// Primeiro consulta sem forçar para verificar se o servidor já virou a música
 		const data = await sincronizarRadio(false);
 		const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
 
-		// Só força a virada no servidor se ele ainda estiver preso na música que acabou de terminar
 		if (!urlServidor || urlServidor === urlAnterior) {
 			await sincronizarRadio(true, { recarregarAudio: true });
 		}
@@ -574,7 +581,8 @@ export const useRadioPlayer = () => {
 	const handleTrackError = useCallback(() => {
 		if (emTransicaoSuaveRef.current) return;
 		setStatusTexto("Reconectando áudio...");
-		setTimeout(() => sincronizarRadio(false, { recarregarAudio: true }), 2000);
+		// Se o arquivo atual falhou (ex.: 404), avança para a próxima faixa válida no servidor
+		setTimeout(() => sincronizarRadio(true, { recarregarAudio: true }), 1500);
 	}, [sincronizarRadio]);
 
 	return {
