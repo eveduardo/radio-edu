@@ -1,2 +1,0 @@
-export { contactRoutes } from "./routes";
-

@@ -6,19 +6,16 @@ import { localStorageEffect } from "./effects";
  * @typedef {"light" | "dark"} Theme
  */
 
-const getInitialTheme = () => {
-	if (typeof window === "undefined" || !window.matchMedia) {
-		return "light";
-	}
-
-	return window.matchMedia("(prefers-color-scheme: dark)").matches
-		? "dark"
-		: "light";
-};
-
 /** @type {import("recoil").RecoilState<Theme>} */
 export const themeAtom = atom({
 	key: withPrefix("theme"),
-	default: getInitialTheme(),
+	default: "dark",
 	effects: [localStorageEffect(withPrefix("theme"))],
+});
+
+/** @type {import("recoil").RecoilState<number>} */
+export const volumeAtom = atom({
+	key: withPrefix("volume"),
+	default: 1,
+	effects: [localStorageEffect(withPrefix("volume"))],
 });

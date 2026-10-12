@@ -1,0 +1,1 @@
+export { locutorRoutes } from "./routes";

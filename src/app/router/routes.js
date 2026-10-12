@@ -1,5 +1,5 @@
-import { homeRoutes } from "@/features/home";
-import { contactRoutes } from "@/features/contact";
+import { playerRoutes } from "@/features/player";
+import { locutorRoutes } from "@/features/locutor";
 
 /**
  * @typedef {Object} AppRoute
@@ -12,15 +12,13 @@ import { contactRoutes } from "@/features/contact";
  */
 
 /**
- * Registro central de rotas. Para adicionar uma feature nova,
- * crie `src/features/<nome>/routes.jsx` e inclua as rotas aqui.
+ * Registro central de rotas.
  *
  * @type {AppRoute[]}
  */
-export const ROUTES = [...homeRoutes, ...contactRoutes];
+export const ROUTES = [...playerRoutes, ...locutorRoutes];
 
 /** Rotas exibidas no menu principal, ordenadas por `order`. */
 export const MENU_ROUTES = ROUTES.filter((route) => route.label).sort(
 	(a, b) => (a.order ?? 0) - (b.order ?? 0),
 );
-

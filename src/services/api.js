@@ -2,13 +2,11 @@ import axios from "axios";
 import { ENV } from "@/config";
 
 /**
- * Instância HTTP compartilhada. Serviços de cada feature devem usar esta instância,
- * por exemplo em `src/features/<nome>/services/<nome>Service.js`.
+ * Instância HTTP compartilhada apontando para o backend PHP da rádio.
  */
 export const api = axios.create({
 	baseURL: ENV.apiUrl,
-	timeout: 15000,
-	headers: { "Content-Type": "application/json" },
+	timeout: 20000,
 });
 
 api.interceptors.response.use(
@@ -22,3 +20,19 @@ api.interceptors.response.use(
 	},
 );
 
+/**
+ * Resolve um caminho relativo retornado pelo backend PHP (ex.: `musicas/faixa.mp3`,
+ * `hora_certa/19_00.mp3`, `voz_stream/chunk_123.webm`) para a URL completa.
+ *
+ * @param {string} relativePath
+ * @returns {string}
+ */
+export const resolveRadioAssetUrl = (relativePath) => {
+	if (!relativePath) return "";
+	if (/^https?:\/\//i.test(relativePath)) return relativePath;
+
+	const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
+	const cleanPath = relativePath.replace(/^\/+/, "").replace(/^radio\//, "");
+
+	return `${cleanBase}/${cleanPath}`;
+};

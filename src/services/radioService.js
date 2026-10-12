@@ -1,0 +1,162 @@
+import { ENV } from "@/config";
+import { api, resolveRadioAssetUrl } from "./api";
+
+/**
+ * Sincroniza o estado atual da programação da rádio (`radio_sync.php`).
+ *
+ * @param {Object} [options]
+ * @param {boolean} [options.forcarProxima=false]
+ */
+export const fetchRadioSync = async ({ forcarProxima = false } = {}) => {
+	const params = { t: Date.now() };
+	if (forcarProxima) {
+		params.forcar_proxima = "1";
+	}
+
+	const { data } = await api.get("/radio_sync.php", { params });
+	return data;
+};
+
+/**
+ * Lista o acervo indexado agrupado por gênero (`radio_sync.php?listar_generos=1`).
+ *
+ * @returns {Promise<Record<string, Array<{id: string, arquivo: string, nome: string, genero: string, url: string, duracao: number}>>>}
+ */
+export const fetchGenresCatalog = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { listar_generos: "1", t: Date.now() },
+	});
+
+	if (data && typeof data === "object" && !Array.isArray(data)) {
+		return data;
+	}
+	return {};
+};
+
+/**
+ * Força a reconstrução do `playlist_cache.json` a partir da pasta `/musicas/`.
+ */
+export const rebuildRadioCache = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { gerar_cache: "1", t: Date.now() },
+	});
+	return data;
+};
+
+/**
+ * Agenda explicitamente a próxima música a tocar (`radio_sync.php?agendar_proxima=...`).
+ *
+ * @param {string} trackIdentifier ID, caminho de arquivo ou título da faixa
+ */
+export const scheduleNextTrack = async (trackIdentifier) => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: {
+			agendar_proxima: trackIdentifier,
+			t: Date.now(),
+		},
+	});
+	return data;
+};
+
+/**
+ * Envia um pedido musical do ouvinte (`POST /fazer_pedido.php`).
+ *
+ * @param {Object} payload
+ * @param {string} payload.arquivo
+ * @param {string} payload.titulo
+ * @param {string} payload.nome
+ * @param {string} [payload.recado]
+ */
+export const submitSongRequest = async ({ arquivo, titulo, nome, recado = "" }) => {
+	const formData = new FormData();
+	formData.append("arquivo", arquivo);
+	formData.append("titulo", titulo);
+	formData.append("nome", nome);
+	formData.append("recado", recado);
+
+	const { data } = await api.post("/fazer_pedido.php", formData);
+	return data;
+};
+
+/**
+ * Lista todos os pedidos dos ouvintes (`locutor.php?acao_pedidos=listar`).
+ */
+export const fetchListenerRequests = async () => {
+	const { data } = await api.get("/locutor.php", {
+		params: { acao_pedidos: "listar", t: Date.now() },
+	});
+	return data?.pedidos || [];
+};
+
+/**
+ * Marca um pedido de ouvinte como já tocado (`locutor.php?acao_pedidos=marcar_tocado`).
+ *
+ * @param {string} chaveLinha
+ */
+export const markRequestAsPlayed = async (chaveLinha) => {
+	const formData = new FormData();
+	formData.append("chave_linha", chaveLinha);
+
+	const { data } = await api.post("/locutor.php?acao_pedidos=marcar_tocado", formData);
+	return data;
+};
+
+/**
+ * Remove um pedido da fila (`locutor.php?acao_pedidos=remover`).
+ *
+ * @param {string} chaveLinha
+ */
+export const removeListenerRequest = async (chaveLinha) => {
+	const formData = new FormData();
+	formData.append("chave_linha", chaveLinha);
+
+	const { data } = await api.post("/locutor.php?acao_pedidos=remover", formData);
+	return data;
+};
+
+/**
+ * Envia um bloco de voz gravado pelo locutor (`POST /api_locutor.php`).
+ *
+ * @param {Blob} audioBlob
+ * @param {string} [password]
+ */
+export const uploadVoiceChunk = async (audioBlob, password = ENV.locutorPassword) => {
+	const formData = new FormData();
+	formData.append("acao", "enviar_audio");
+	formData.append("senha", password);
+	formData.append("audio", audioBlob, "voz.webm");
+
+	const { data } = await api.post("/api_locutor.php", formData);
+	return data;
+};
+
+/**
+ * Baixa um chunk de voz do locutor com retry automático caso o arquivo ainda esteja sendo gravado.
+ *
+ * @param {number|string} chunkId
+ * @param {number} [retries=2]
+ * @returns {Promise<Blob|null>}
+ */
+export const fetchVoiceChunkBlob = async (chunkId, retries = 2) => {
+	const url = `${resolveRadioAssetUrl(`voz_stream/chunk_${chunkId}.webm`)}?t=${Date.now()}`;
+
+	for (let attempt = 0; attempt <= retries; attempt++) {
+		try {
+			const response = await fetch(url);
+			if (!response.ok) {
+				throw new Error("Chunk ainda não disponível");
+			}
+			const blob = await response.blob();
+			if (blob.size < 500) {
+				return null;
+			}
+			return blob;
+		} catch {
+			if (attempt < retries) {
+				await new Promise((r) => setTimeout(r, 250));
+			}
+		}
+	}
+
+	return null;
+};

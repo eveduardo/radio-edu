@@ -1,0 +1,600 @@
+.locutorScreen {
+	width: 100%;
+	height: 100%;
+	overflow-y: auto;
+	background: #090c12;
+	color: #e0e6ed;
+	user-select: none;
+	padding-top: 38px;
+}
+
+.containerMesa {
+	width: 100%;
+	max-width: 520px;
+	margin: 0 auto;
+	padding: 10px 14px 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.topoMesa {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-bottom: 6px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.titulo {
+	font-size: 16px;
+	font-weight: 800;
+	letter-spacing: 0.6px;
+	color: #ffb703;
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.statusBadge {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+}
+
+.noAr {
+	box-shadow: 0 0 10px rgba(220, 38, 38, 0.6);
+	animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.4;
+	}
+}
+
+.secaoCanais {
+	position: relative;
+	display: flex;
+	justify-content: space-around;
+	align-items: flex-end;
+	background: radial-gradient(circle at 50% 20%, #1e2638 0%, #0d121c 100%);
+	border: 1px solid #2d3b55;
+	border-top: 1px solid #475a80;
+	border-radius: 14px;
+	padding: 12px 10px 10px;
+	box-shadow:
+		0 8px 24px rgba(0, 0, 0, 0.75),
+		inset 0 1px 1px rgba(255, 255, 255, 0.2),
+		inset 0 -2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.canalFader {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	width: 47%;
+	padding: 8px 6px;
+	background: linear-gradient(180deg, #131924 0%, #0b0f17 100%);
+	border: 1px solid #1a2334;
+	border-radius: 10px;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.08),
+		0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.nomeCanal {
+	font-size: 10px;
+	font-weight: 800;
+	color: #94a3b8;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	text-shadow: 0 1px 2px #000;
+}
+
+.valorFader {
+	font-family: "Courier New", Courier, monospace;
+	font-size: 11px;
+	font-weight: 900;
+	color: #ffb703;
+	background: #05070a;
+	border: 1px solid #1e293b;
+	padding: 2px 8px;
+	border-radius: 4px;
+	margin: 3px 0 6px;
+	letter-spacing: 0.5px;
+	box-shadow:
+		inset 0 2px 5px rgba(0, 0, 0, 0.9),
+		0 0 8px rgba(255, 183, 3, 0.15);
+	min-width: 50px;
+	text-align: center;
+}
+
+.faderComVuRow {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	width: 100%;
+}
+
+.vuVerticalBox {
+	background: #06090e;
+	border: 1px solid #1c2738;
+	border-radius: 4px;
+	padding: 3px 2px;
+	box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.95);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.vuVerticalBox canvas {
+	display: block;
+	border-radius: 2px;
+}
+
+.faderSlot {
+	position: relative;
+	height: 125px;
+	width: 45px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.faderVertical {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 115px;
+	height: 10px;
+	background: #05080d;
+	border-radius: 5px;
+	outline: none;
+	transform: rotate(-90deg);
+	border: 1px solid #16202e;
+	box-shadow:
+		inset 0 2px 4px rgba(0, 0, 0, 0.95),
+		inset 0 -1px 2px rgba(255, 255, 255, 0.05),
+		0 1px 1px rgba(255, 255, 255, 0.08);
+	z-index: 2;
+}
+
+.faderVertical::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 32px;
+	height: 22px;
+	border-radius: 4px;
+	background:
+		repeating-linear-gradient(
+			90deg,
+			transparent,
+			transparent 3px,
+			rgba(0, 0, 0, 0.3) 3px,
+			rgba(0, 0, 0, 0.3) 4px
+		),
+		linear-gradient(180deg, #ffca3a 0%, #e85d04 50%, #7f1d1d 100%);
+	cursor: grab;
+	border: 1px solid #fff;
+	box-shadow:
+		0 4px 10px rgba(0, 0, 0, 0.85),
+		inset 0 1px 2px rgba(255, 255, 255, 0.8),
+		inset 0 -2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.btnCanalMic {
+	margin-top: 8px;
+	width: 110px;
+	padding: 7px 4px;
+	font-size: 11px;
+	font-weight: 800;
+	border-radius: 6px;
+	border: 1px solid #334155;
+	background: linear-gradient(180deg, #2b3648 0%, #151c27 100%);
+	color: #cbd5e1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	cursor: pointer;
+	box-shadow:
+		0 3px 6px rgba(0, 0, 0, 0.6),
+		inset 0 1px 0 rgba(255, 255, 255, 0.15);
+	transition: all 0.15s ease;
+}
+
+.ativo {
+	background: linear-gradient(180deg, #ef4444 0%, #991b1b 100%);
+	border-color: #f87171;
+	color: #fff;
+	box-shadow:
+		0 0 16px rgba(239, 68, 68, 0.7),
+		inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.infoCanalMusica {
+	margin-top: 8px;
+	width: 110px;
+	padding: 7px 4px;
+	font-size: 9px;
+	font-weight: 800;
+	text-align: center;
+	color: #64748b;
+	background: #06090e;
+	border: 1px solid #1c2536;
+	border-radius: 6px;
+	letter-spacing: 0.8px;
+	box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.cardMusicaNoAr {
+	background: linear-gradient(180deg, #101c38 0%, #0d1527 100%);
+	border: 1px solid #1e3a8a;
+	border-radius: 10px;
+	padding: 7px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.statusLinhaTopo {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 9px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	color: #38bdf8;
+}
+
+.statusTopoRight {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.badgeTempoRestante {
+	background: #0f172a;
+	border: 1px solid #1e293b;
+	padding: 2px 7px;
+	border-radius: 4px;
+	color: #facc15;
+	font-family: monospace;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.btnFadeProxima {
+	background: linear-gradient(135deg, #e63946, #c1121f);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	color: #fff;
+	font-size: 10px;
+	font-weight: 800;
+	padding: 3px 8px;
+	border-radius: 6px;
+	cursor: pointer;
+	letter-spacing: 0.4px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.btnFadeProxima:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.nomeMusicaAr {
+	font-size: 12px;
+	font-weight: 700;
+	color: #f8fafc;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.proximaProgramadaLbl {
+	font-size: 10px;
+	color: #94a3b8;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.painelPedidos {
+	background: #111722;
+	border: 1px solid rgba(245, 158, 11, 0.4);
+	border-radius: 12px;
+	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	max-height: 165px;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.painelPedidosHeader {
+	font-size: 11px;
+	font-weight: 800;
+	color: #fbbf24;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 6px;
+}
+
+.btnRefresh {
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font-size: 10px;
+	font-weight: 700;
+	padding: 3px 8px;
+	border-radius: 5px;
+	background: rgba(255, 255, 255, 0.06);
+	transition: background 0.2s;
+}
+
+.btnRefresh:hover {
+	background: rgba(255, 255, 255, 0.14);
+}
+
+.areaScrollPedidos {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding-right: 2px;
+}
+
+.itemPedidoCard {
+	background: #182030;
+	border: 1px solid #28354b;
+	border-radius: 8px;
+	padding: 6px 9px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+}
+
+.dadosPedidoInfo {
+	flex: 1;
+	min-width: 0;
+}
+
+.pedidoLinhaTopo {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 10px;
+	font-weight: 700;
+	color: #f8fafc;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.badgeOuvinte {
+	background: #f59e0b;
+	color: #0b0e14;
+	font-size: 9px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-weight: 800;
+	white-space: nowrap;
+}
+
+.pedidoRecado {
+	font-size: 9px;
+	color: #94a3b8;
+	font-style: italic;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-top: 3px;
+}
+
+.botoesAcaoPedido {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	flex-shrink: 0;
+}
+
+.badgeTocado {
+	background: #1e293b;
+	color: #64748b;
+	border: 1px solid #334155;
+	font-size: 9px;
+	font-weight: 700;
+	padding: 4px 7px;
+	border-radius: 6px;
+	white-space: nowrap;
+}
+
+.btnAtenderPedido {
+	background: #059669;
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	padding: 5px 8px;
+	font-size: 10px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.btnDescartarPedido {
+	background: #dc2626;
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	padding: 5px 8px;
+	font-size: 10px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.painelAcervo {
+	flex: 1;
+	min-height: 160px;
+	background: #111722;
+	border: 1px solid #1f293d;
+	border-radius: 12px;
+	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.painelHeader {
+	font-size: 11px;
+	font-weight: 800;
+	color: #94a3b8;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	margin-bottom: 6px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.acervoHeaderActions {
+	display: flex;
+	gap: 6px;
+}
+
+.gridGeneros {
+	flex: 1;
+	overflow-y: auto;
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	grid-auto-rows: 40px;
+	align-content: start;
+	gap: 6px;
+	padding-right: 2px;
+}
+
+.cardGeneroBtn {
+	background: #161e2c;
+	border: 1px solid #283548;
+	border-radius: 8px;
+	padding: 8px 10px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.cardGeneroBtn:hover {
+	background: #1f293b;
+	border-color: #38bdf8;
+}
+
+.generoNome {
+	font-size: 11px;
+	font-weight: 700;
+	color: #e2e8f0;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.generoBadgeCount {
+	background: #0f172a;
+	border: 1px solid #334155;
+	font-size: 9px;
+	font-weight: 700;
+	color: #38bdf8;
+	padding: 2px 6px;
+	border-radius: 10px;
+	white-space: nowrap;
+}
+
+.emptyPanelText {
+	font-size: 11px;
+	color: #64748b;
+	text-align: center;
+	padding: 12px;
+}
+
+.emptyGenerosText {
+	font-size: 11px;
+	color: #94a3b8;
+	grid-column: span 2;
+	text-align: center;
+	padding: 14px;
+}
+
+.modalGeneroBody {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.listaMusicasGenero {
+	max-height: 320px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+	padding-right: 4px;
+}
+
+.itemMusicaLinha {
+	background: #17202f;
+	border: 1px solid #28384d;
+	border-radius: 8px;
+	padding: 10px 12px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+}
+
+.itemMusicaTitulo {
+	font-size: 12px;
+	font-weight: 600;
+	color: #f1f5f9;
+	line-height: 1.35;
+	flex: 1;
+	word-break: break-word;
+}
+
+.modalAvisoContent {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--space-2);
+}
+
+.modalAvisoIcone {
+	font-size: 28px;
+}
+
+.modalAvisoTexto {
+	font-size: var(--text-sm);
+	color: var(--color-text);
+	white-space: pre-line;
+	line-height: 1.45;
+}
+
+.modalConfirmActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	width: 100%;
+}

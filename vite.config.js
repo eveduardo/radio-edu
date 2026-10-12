@@ -7,10 +7,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
+	plugins: [react()],
+	resolve: {
+		alias: {
+			"@": path.resolve(__dirname, "./src"),
+		},
+	},
+	server: {
+		proxy: {
+			"/radio-api": {
+				target: "http://localhost/datasystem/radio",
+				changeOrigin: true,
+				rewrite: (p) => p.replace(/^\/radio-api/, ""),
+			},
+		},
+	},
 });
