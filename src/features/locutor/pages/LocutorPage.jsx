@@ -37,6 +37,7 @@ const LocutorPage = () => {
 
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
 	const [buscaMusicaModal, setBuscaMusicaModal] = useState("");
+	const [pedidoLeituraAtivo, setPedidoLeituraAtivo] = useState(null);
 
 	const faixasDoGeneroFiltradas = useMemo(() => {
 		if (!generoModalAtivo) return [];
@@ -189,7 +190,12 @@ const LocutorPage = () => {
 						) : (
 							pedidos.map((p) => (
 								<div key={p.chave_linha} className={styles.itemPedidoCard}>
-									<div className={styles.dadosPedidoInfo}>
+									<button
+										type="button"
+										className={styles.dadosPedidoInfoBtn}
+										onClick={() => setPedidoLeituraAtivo(p)}
+										title="Clique para abrir e ler o pedido em tamanho grande"
+									>
 										<div className={styles.pedidoLinhaTopo}>
 											<span className={styles.badgeOuvinte}>👤 {p.nome}</span>
 											<span title={p.titulo}>🎵 {p.titulo}</span>
@@ -199,8 +205,16 @@ const LocutorPage = () => {
 												💬 &ldquo;{p.recado}&rdquo;
 											</div>
 										)}
-									</div>
+									</button>
 									<div className={styles.botoesAcaoPedido}>
+										<button
+											type="button"
+											className={styles.btnLerPedido}
+											title="Abrir pedido em fonte grande para leitura no ar"
+											onClick={() => setPedidoLeituraAtivo(p)}
+										>
+											📖 Ler
+										</button>
 										{p.tocado ? (
 											<span className={styles.badgeTocado}>✔ Já Tocou</span>
 										) : (
@@ -295,6 +309,104 @@ const LocutorPage = () => {
 				</div>
 			</div>
 
+			{/* MODAL DE LEITURA AMPLIADA DO PEDIDO DO OUVINTE */}
+			<Modal
+				isOpen={Boolean(pedidoLeituraAtivo)}
+				onClose={() => setPedidoLeituraAtivo(null)}
+				title="🎙️ Leitura de Pedido no Ar"
+				size="md"
+				closeLabel="Fechar leitura do pedido"
+				footer={
+					<div className={styles.modalLeituraFooter}>
+						<button
+							type="button"
+							className={styles.btnDescartarPedidoModal}
+							onClick={() => {
+								const pedidoAlvo = pedidoLeituraAtivo;
+								setPedidoLeituraAtivo(null);
+								if (pedidoAlvo) solicitarDescartePedido(pedidoAlvo);
+							}}
+						>
+							🗑 Excluir
+						</button>
+						<div className={styles.modalLeituraRightActions}>
+							{pedidoLeituraAtivo && !pedidoLeituraAtivo.tocado && (
+								<>
+									<button
+										type="button"
+										className={styles.btnAcervoAgendar}
+										onClick={() => {
+											const pedidoAlvo = pedidoLeituraAtivo;
+											setPedidoLeituraAtivo(null);
+											atenderPedido(pedidoAlvo, false);
+										}}
+									>
+										▶ Agendar
+									</button>
+									<button
+										type="button"
+										className={styles.btnAcervoTocarAgora}
+										disabled={transicaoEmAndamento}
+										onClick={() => {
+											const pedidoAlvo = pedidoLeituraAtivo;
+											setPedidoLeituraAtivo(null);
+											atenderPedido(pedidoAlvo, true);
+										}}
+									>
+										⏭ Tocar Agora
+									</button>
+								</>
+							)}
+							<Button
+								intent="neutral"
+								variant="outline"
+								onClick={() => setPedidoLeituraAtivo(null)}
+							>
+								Fechar
+							</Button>
+						</div>
+					</div>
+				}
+			>
+				{pedidoLeituraAtivo && (
+					<div className={styles.modalLeituraBody}>
+						<div className={styles.leituraBlocoOuvinte}>
+							<span className={styles.leituraLabel}>OUVINTE</span>
+							<div className={styles.leituraNomeOuvinte}>
+								👤 {pedidoLeituraAtivo.nome}
+							</div>
+							{pedidoLeituraAtivo.data && (
+								<span className={styles.leituraDataHorario}>
+									Enviado em: {pedidoLeituraAtivo.data}
+								</span>
+							)}
+						</div>
+
+						<div className={styles.leituraBlocoMusica}>
+							<span className={styles.leituraLabel}>MÚSICA PEDIDA</span>
+							<div className={styles.leituraTituloMusica}>
+								🎵 {pedidoLeituraAtivo.titulo}
+							</div>
+						</div>
+
+						<div className={styles.leituraBlocoRecado}>
+							<span className={styles.leituraLabel}>
+								RECADO / ALÔ PARA LER NO AR
+							</span>
+							{pedidoLeituraAtivo.recado ? (
+								<div className={styles.leituraTextoRecado}>
+									&ldquo;{pedidoLeituraAtivo.recado}&rdquo;
+								</div>
+							) : (
+								<div className={styles.leituraSemRecado}>
+									O ouvinte não deixou recado adicional — apenas pediu a música.
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+			</Modal>
+
 			{/* MODAL DE SELEÇÃO DE MÚSICA POR GÊNERO */}
 			<Modal
 				isOpen={Boolean(generoModalAtivo)}
@@ -328,19 +440,19 @@ const LocutorPage = () => {
 										🎵 {faixa.nome}
 									</span>
 									<div className={styles.botoesAcaoPedido}>
-										<Button
-											intent="secondary"
-											variant="outline"
+										<button
+											type="button"
+											className={styles.btnAcervoAgendar}
 											onClick={() => {
 												setGeneroModalAtivo(null);
 												agendarFaixaAcervo(faixa, false);
 											}}
 										>
 											▶ Agendar
-										</Button>
-										<Button
-											intent="primary"
-											variant="filled"
+										</button>
+										<button
+											type="button"
+											className={styles.btnAcervoTocarAgora}
 											disabled={transicaoEmAndamento}
 											onClick={() => {
 												setGeneroModalAtivo(null);
@@ -348,7 +460,7 @@ const LocutorPage = () => {
 											}}
 										>
 											⏭ Tocar Agora
-										</Button>
+										</button>
 									</div>
 								</div>
 							))

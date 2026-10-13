@@ -1,7 +1,10 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Badge, Button } from "@jposawa/ronin-ui";
-import { useRadioPlayerContext } from "../context/RadioPlayerContext";
+import {
+	RadioPlayerProvider,
+	useRadioPlayerContext,
+} from "../context/RadioPlayerContext";
 import { VinylDisc } from "../components/VinylDisc";
 import { HorizontalVuMeter } from "../components/HorizontalVuMeter";
 import { SongRequestModal } from "../components/SongRequestModal";
@@ -13,7 +16,7 @@ const getVolumeIcon = (val) => {
 	return "🔊";
 };
 
-const RadioPlayerPage = () => {
+const RadioPlayerContent = () => {
 	const [modalPedidoAberto, setModalPedidoAberto] = useState(false);
 
 	const {
@@ -134,5 +137,11 @@ const RadioPlayerPage = () => {
 		</div>
 	);
 };
+
+const RadioPlayerPage = () => (
+	<RadioPlayerProvider>
+		<RadioPlayerContent />
+	</RadioPlayerProvider>
+);
 
 export default RadioPlayerPage;

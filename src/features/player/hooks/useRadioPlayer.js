@@ -11,9 +11,7 @@ import {
 export const useRadioPlayer = () => {
 	const [volumeMaster, setVolumeMaster] = useRecoilState(volumeAtom);
 	const [estaTocando, setEstaTocando] = useState(true);
-	const [tituloMusica, setTituloMusica] = useState(
-		"Aperte o play pra ligar...",
-	);
+	const [tituloMusica, setTituloMusica] = useState("Sintonizando Flash FM...");
 	const [nomeOuvinte, setNomeOuvinte] = useState("");
 	const [proximaFaixa, setProximaFaixa] = useState("Aguardando programação");
 	const [statusTexto, setStatusTexto] = useState("Transmitindo em tempo real");
@@ -46,6 +44,7 @@ export const useRadioPlayer = () => {
 	const ultimaTrocaForcadaRef = useRef(0);
 	const ultimaAtualizacaoProgRef = useRef(0);
 	const emTransicaoSuaveRef = useRef(false);
+	const sincronizandoRef = useRef(false);
 	const wakeLockRef = useRef(null);
 
 	const estadoMesaRef = useRef({
@@ -205,6 +204,15 @@ export const useRadioPlayer = () => {
 
 	const sincronizarRadio = useCallback(
 		async (forcarProxima = false, { recarregarAudio = false } = {}) => {
+			if (
+				sincronizandoRef.current &&
+				!forcarProxima &&
+				!recarregarAudio
+			) {
+				return null;
+			}
+			sincronizandoRef.current = true;
+
 			try {
 				const data = await fetchRadioSync({ forcarProxima });
 
@@ -248,34 +256,73 @@ export const useRadioPlayer = () => {
 						urlFaixaAtualRef.current !== novaUrl)
 				) {
 					urlFaixaAtualRef.current = novaUrl;
+					player.muted = false;
 					player.src = novaUrl;
 					aplicarVolumesMesa();
+
+					const posicionarOffset = () => {
+						if (!forcarProxima && offsetExato > 2) {
+							try {
+								player.currentTime = offsetExato;
+							} catch {
+								// ignore seek error before metadata
+							}
+						}
+					};
+
+					if (player.readyState >= 1) {
+						posicionarOffset();
+					} else {
+						player.addEventListener("loadedmetadata", posicionarOffset, {
+							once: true,
+						});
+					}
 
 					if (estaTocandoRef.current) {
 						if (audioCtxRef.current?.state === "suspended") {
 							audioCtxRef.current.resume().catch(() => {});
 						}
 
-						player
-							.play()
-							.then(() => {
-								if (!forcarProxima && offsetExato > 2) {
-									try {
-										player.currentTime = offsetExato;
-									} catch {
-										// ignore seek error before metadata
+						const iniciarPlay = () => {
+							player
+								.play()
+								.then(() => {
+									player.muted = false;
+									aplicarVolumesMesa();
+									setStatusTexto("Transmitindo em tempo real");
+								})
+								.catch((err) => {
+									if (err?.name === "AbortError") {
+										player.addEventListener(
+											"canplay",
+											() => {
+												if (estaTocandoRef.current && player.paused) {
+													player.play().catch(() => {});
+												}
+											},
+											{ once: true },
+										);
+										return;
 									}
-								}
-								setStatusTexto("Transmitindo em tempo real");
-							})
-							.catch(() => {
-								setStatusTexto("Toque no play ou na tela para ouvir");
-							});
+									// Se o navegador bloqueou autoplay com som na primeira abertura,
+									// inicia a reprodução sincronizada imediatamente e libera o som no primeiro movimento/evento
+									player.muted = true;
+									player
+										.play()
+										.then(() => {
+											setStatusTexto("Transmitindo em tempo real");
+										})
+										.catch(() => {});
+								});
+						};
+
+						iniciarPlay();
 					}
 				} else if (
 					player &&
 					estaTocandoRef.current &&
 					!player.paused &&
+					player.readyState >= 2 &&
 					Math.abs(player.currentTime - offsetExato) > 4
 				) {
 					try {
@@ -298,6 +345,8 @@ export const useRadioPlayer = () => {
 			} catch {
 				setStatusTexto("Erro ao sincronizar rádio");
 				return null;
+			} finally {
+				sincronizandoRef.current = false;
 			}
 		},
 		[aplicarVolumesMesa, tocarHoraCerta],
@@ -382,6 +431,9 @@ export const useRadioPlayer = () => {
 			setEstaTocando(true);
 			setStatusTexto("Iniciando transmissão...");
 
+			if (player) {
+				player.muted = false;
+			}
 			aplicarVolumesMesa();
 
 			if (player?.src && player.src !== window.location.href) {
@@ -425,29 +477,74 @@ export const useRadioPlayer = () => {
 		return () => clearInterval(interval);
 	}, [sincronizarRadio]);
 
-	// Desbloqueio de áudio em qualquer clique/toque quando o AudioContext ou player estiverem suspensos/pausados
+	// Desbloqueio imediato de áudio em qualquer interação/movimento
 	useEffect(() => {
-		const desbloquear = () => {
-			inicializarAudioContext();
+		const desbloquear = (e) => {
+			const isUserActivation =
+				e.type === "click" ||
+				e.type === "touchstart" ||
+				e.type === "pointerdown" ||
+				e.type === "mousedown" ||
+				e.type === "keydown";
+
+			if (isUserActivation) {
+				inicializarAudioContext();
+			}
+
 			const player = playerRef.current;
-			if (estaTocandoRef.current && player?.paused && player.src) {
+			if (!player || !estaTocandoRef.current || !player.src) return;
+
+			if (player.muted) {
+				player.muted = false;
+				aplicarVolumesMesa();
+				if (player.paused) {
+					player
+						.play()
+						.then(() => {
+							setStatusTexto("Transmitindo em tempo real");
+						})
+						.catch(() => {
+							player.muted = true;
+							player.play().catch(() => {});
+						});
+					return;
+				}
+			}
+
+			if (player.paused) {
 				player
 					.play()
 					.then(() => {
 						setStatusTexto("Transmitindo em tempo real");
 					})
-					.catch(() => {});
+					.catch(() => {
+						if (!isUserActivation) {
+							player.muted = true;
+							player.play().catch(() => {});
+						}
+					});
 			}
 		};
 
-		document.addEventListener("click", desbloquear);
-		document.addEventListener("touchstart", desbloquear);
+		const eventos = [
+			"click",
+			"touchstart",
+			"pointerdown",
+			"mousedown",
+			"keydown",
+			"pointermove",
+			"mousemove",
+			"wheel",
+		];
+
+		eventos.forEach((evt) =>
+			document.addEventListener(evt, desbloquear, { passive: true }),
+		);
 
 		return () => {
-			document.removeEventListener("click", desbloquear);
-			document.removeEventListener("touchstart", desbloquear);
+			eventos.forEach((evt) => document.removeEventListener(evt, desbloquear));
 		};
-	}, [inicializarAudioContext]);
+	}, [aplicarVolumesMesa, inicializarAudioContext]);
 
 	// Assinatura em tempo real do Firebase (nó `mesa`)
 	useEffect(() => {

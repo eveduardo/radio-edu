@@ -19,6 +19,7 @@ export const RadioPlayerProvider = ({ children }) => {
 			{children}
 			<audio
 				ref={radio.playerRef}
+				autoPlay
 				preload="auto"
 				crossOrigin="anonymous"
 				onEnded={radio.handleTrackEnded}
