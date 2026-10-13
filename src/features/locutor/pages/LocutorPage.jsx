@@ -205,67 +205,83 @@ const LocutorPage = () => {
 								Nenhum pedido no momento.
 							</div>
 						) : (
-							pedidos.map((p) => (
-								<div key={p.chave_linha} className={styles.itemPedidoCard}>
-									<button
-										type="button"
-										className={styles.dadosPedidoInfoBtn}
-										onClick={() => setPedidoLeituraAtivo(p)}
-										title="Clique para abrir e ler o pedido em tamanho grande"
-									>
-										<div className={styles.pedidoLinhaTopo}>
-											<span className={styles.badgeOuvinte}>👤 {p.nome}</span>
-											<span title={p.titulo}>🎵 {p.titulo}</span>
-										</div>
-										{p.recado && (
-											<div className={styles.pedidoRecado}>
-												💬 &ldquo;{p.recado}&rdquo;
+							pedidos.map((p) => {
+								const temRecado = Boolean(p.recado && p.recado.trim());
+								return (
+									<div key={p.chave_linha} className={styles.itemPedidoCard}>
+										{temRecado ? (
+											<button
+												type="button"
+												className={styles.dadosPedidoInfoBtn}
+												onClick={() => setPedidoLeituraAtivo(p)}
+												title="Clique para abrir e ler o recado em tamanho grande"
+											>
+												<div className={styles.pedidoLinhaTopo}>
+													<span className={styles.badgeOuvinte}>
+														👤 {p.nome}
+													</span>
+													<span title={p.titulo}>🎵 {p.titulo}</span>
+												</div>
+												<div className={styles.pedidoRecado}>
+													💬 &ldquo;{p.recado}&rdquo;
+												</div>
+											</button>
+										) : (
+											<div className={styles.dadosPedidoInfo}>
+												<div className={styles.pedidoLinhaTopo}>
+													<span className={styles.badgeOuvinte}>
+														👤 {p.nome}
+													</span>
+													<span title={p.titulo}>🎵 {p.titulo}</span>
+												</div>
 											</div>
 										)}
-									</button>
-									<div className={styles.botoesAcaoPedido}>
-										<button
-											type="button"
-											className={styles.btnLerPedido}
-											title="Abrir pedido em fonte grande para leitura no ar"
-											onClick={() => setPedidoLeituraAtivo(p)}
-										>
-											📖 Ler
-										</button>
-										{p.tocado ? (
-											<span className={styles.badgeTocado}>✔ Já Tocou</span>
-										) : (
-											<>
+										<div className={styles.botoesAcaoPedido}>
+											{temRecado && (
 												<button
 													type="button"
-													className={styles.btnAtenderPedido}
-													title="Agendar como próxima faixa"
-													onClick={() => atenderPedido(p, false)}
+													className={styles.btnLerPedido}
+													title="Abrir recado em fonte grande para leitura no ar"
+													onClick={() => setPedidoLeituraAtivo(p)}
 												>
-													▶ A Seguir
+													📖 Ler
 												</button>
-												<button
-													type="button"
-													className={styles.btnFadeProxima}
-													title="Entrar no ar agora com crossfade"
-													disabled={transicaoEmAndamento}
-													onClick={() => atenderPedido(p, true)}
-												>
-													⏭ Agora
-												</button>
-											</>
-										)}
-										<button
-											type="button"
-											className={styles.btnDescartarPedido}
-											title="Excluir do arquivo"
-											onClick={() => solicitarDescartePedido(p)}
-										>
-											✕
-										</button>
+											)}
+											{p.tocado ? (
+												<span className={styles.badgeTocado}>✔ Já Tocou</span>
+											) : (
+												<>
+													<button
+														type="button"
+														className={styles.btnAtenderPedido}
+														title="Agendar como próxima faixa"
+														onClick={() => atenderPedido(p, false)}
+													>
+														▶ A Seguir
+													</button>
+													<button
+														type="button"
+														className={styles.btnFadeProxima}
+														title="Entrar no ar agora com crossfade"
+														disabled={transicaoEmAndamento}
+														onClick={() => atenderPedido(p, true)}
+													>
+														⏭ Agora
+													</button>
+												</>
+											)}
+											<button
+												type="button"
+												className={styles.btnDescartarPedido}
+												title="Excluir do arquivo"
+												onClick={() => solicitarDescartePedido(p)}
+											>
+												✕
+											</button>
+										</div>
 									</div>
-								</div>
-							))
+								);
+							})
 						)}
 					</div>
 				</div>

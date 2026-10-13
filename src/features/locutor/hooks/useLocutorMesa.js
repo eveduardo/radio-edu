@@ -184,6 +184,37 @@ export const useLocutorMesa = () => {
 		[aplicarVolumeMonitor, sincronizarMesaFirebase],
 	);
 
+	// Redireciona automaticamente no PC de IP de rede (ex.: http://192.168.x.x:5173/locutor)
+	// para http://localhost:5173/locutor, pois o Chrome exige localhost/HTTPS para liberar o microfone
+	useEffect(() => {
+		const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+		if (
+			!isMobile &&
+			!window.isSecureContext &&
+			window.location.hostname !== "localhost" &&
+			window.location.hostname !== "127.0.0.1"
+		) {
+			const portPart = window.location.port ? `:${window.location.port}` : "";
+			window.location.replace(
+				`http://localhost${portPart}${window.location.pathname}${window.location.search}`,
+			);
+		}
+	}, []);
+
+	const liberarRecursosMic = useCallback(() => {
+		if (streamMicRef.current) {
+			streamMicRef.current.getTracks().forEach((track) => track.stop());
+			streamMicRef.current = null;
+		}
+
+		if (micAudioCtxRef.current) {
+			micAudioCtxRef.current.close().catch(() => {});
+			micAudioCtxRef.current = null;
+			micAnalyserRef.current = null;
+			micDataArrayRef.current = null;
+		}
+	}, []);
+
 	const iniciarNovoBloco = useCallback(() => {
 		if (!aoVivoRef.current || !streamMicRef.current) return;
 		if (typeof MediaRecorder === "undefined") return;
@@ -222,7 +253,7 @@ export const useLocutorMesa = () => {
 				});
 				chunksAtuaisRef.current = [];
 
-				if (audioBlob.size > 2000) {
+				if (audioBlob.size > 400) {
 					uploadVoiceChunk(audioBlob)
 						.then((res) => {
 							if (res?.chunk) {
@@ -235,18 +266,20 @@ export const useLocutorMesa = () => {
 
 			if (aoVivoRef.current && streamMicRef.current) {
 				iniciarNovoBloco();
+			} else {
+				liberarRecursosMic();
 			}
 		};
 
 		try {
-			gravador.start();
+			gravador.start(250);
 			inicioGravacaoBlocoRef.current = Date.now();
 			timestampUltimoSomRef.current = Date.now();
 			gravandoBlocoRef.current = true;
 		} catch {
 			// ignore
 		}
-	}, []);
+	}, [liberarRecursosMic]);
 
 	const monitorarAtividadeVoz = useCallback(() => {
 		if (!aoVivoRef.current || !micAnalyserRef.current) return;
@@ -264,13 +297,13 @@ export const useLocutorMesa = () => {
 		const agora = Date.now();
 		const duracaoAtual = agora - inicioGravacaoBlocoRef.current;
 
-		if (volumeMedio > 12) {
+		if (volumeMedio > 10) {
 			timestampUltimoSomRef.current = agora;
 		}
 
 		const tempoEmSilencio = agora - timestampUltimoSomRef.current;
-		const cortePorSilencio = duracaoAtual >= 6000 && tempoEmSilencio >= 700;
-		const cortePorTetoMaximo = duracaoAtual >= 10000;
+		const cortePorSilencio = duracaoAtual >= 2500 && tempoEmSilencio >= 500;
+		const cortePorTetoMaximo = duracaoAtual >= 4500;
 
 		if (gravandoBlocoRef.current && (cortePorSilencio || cortePorTetoMaximo)) {
 			gravandoBlocoRef.current = false;
@@ -292,6 +325,7 @@ export const useLocutorMesa = () => {
 	const desligarMicrofone = useCallback(() => {
 		aoVivoRef.current = false;
 		setAoVivo(false);
+		gravandoBlocoRef.current = false;
 
 		if (loopDeteccaoIdRef.current) {
 			cancelAnimationFrame(loopDeteccaoIdRef.current);
@@ -303,30 +337,42 @@ export const useLocutorMesa = () => {
 			gravadorMediaRef.current.state !== "inactive"
 		) {
 			try {
+				// O onstop enviará o bloco final e em seguida chamará liberarRecursosMic()
 				gravadorMediaRef.current.stop();
 			} catch {
-				// ignore
+				liberarRecursosMic();
 			}
-		}
-
-		if (streamMicRef.current) {
-			streamMicRef.current.getTracks().forEach((track) => track.stop());
-			streamMicRef.current = null;
-		}
-
-		if (micAudioCtxRef.current) {
-			micAudioCtxRef.current.close().catch(() => {});
-			micAudioCtxRef.current = null;
-			micAnalyserRef.current = null;
-			micDataArrayRef.current = null;
+		} else {
+			liberarRecursosMic();
 		}
 
 		sincronizarMesaFirebase(true);
-	}, [sincronizarMesaFirebase]);
+	}, [liberarRecursosMic, sincronizarMesaFirebase]);
 
 	const alternarMicrofone = useCallback(async () => {
 		if (!aoVivoRef.current) {
+			if (
+				!window.isSecureContext &&
+				window.location.hostname !== "localhost" &&
+				window.location.hostname !== "127.0.0.1"
+			) {
+				const portPart = window.location.port ? `:${window.location.port}` : "";
+				window.location.href = `http://localhost${portPart}${window.location.pathname}${window.location.search}`;
+				return;
+			}
+
 			const stream = await obterStreamMicrofone();
+			if (!stream) {
+				setAvisoModal({
+					icone: "🎤",
+					titulo: "Permissão do Microfone",
+					mensagem:
+						"Não foi possível acessar o microfone.\nVerifique se a permissão de Microfone está liberada no ícone ao lado da barra de endereço do navegador.",
+				});
+				return;
+			}
+
+			streamMicRef.current = stream;
 
 			try {
 				const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -339,28 +385,23 @@ export const useLocutorMesa = () => {
 					analyser.fftSize = 64;
 					const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-					if (stream) {
-						const micSource = ctx.createMediaStreamSource(stream);
-						micSource.connect(analyser);
-						streamMicRef.current = stream;
-					}
+					const micSource = ctx.createMediaStreamSource(stream);
+					micSource.connect(analyser);
 
 					micAudioCtxRef.current = ctx;
 					micAnalyserRef.current = analyser;
 					micDataArrayRef.current = dataArray;
 				}
 			} catch {
-				// Prossegue ativando o canal CH-1 mesmo sem Web Audio
+				// Continua com a gravação mesmo se o AnalyserNode falhar
 			}
 
 			aoVivoRef.current = true;
 			setAoVivo(true);
 			sincronizarMesaFirebase(true);
 
-			if (streamMicRef.current) {
-				iniciarNovoBloco();
-				monitorarAtividadeVoz();
-			}
+			iniciarNovoBloco();
+			monitorarAtividadeVoz();
 		} else {
 			desligarMicrofone();
 		}
@@ -513,7 +554,9 @@ export const useLocutorMesa = () => {
 				!haPedidoPendente &&
 				nomeProximaVisor
 			) {
-				await scheduleNextTrack(nomeProximaVisor).catch(() => {});
+				await scheduleNextTrack(nomeProximaVisor, {
+					ignorarPedido: true,
+				}).catch(() => {});
 			}
 
 			// 1. Vira a faixa no servidor e atualiza o visor da mesa
@@ -691,7 +734,9 @@ export const useLocutorMesa = () => {
 			const nomeFaixa = faixa.nome || "Música";
 
 			try {
-				const data = await scheduleNextTrack(idParaEnviar);
+				const data = await scheduleNextTrack(idParaEnviar, {
+					ignorarPedido: true,
+				});
 				if (data?.sucesso) {
 					temAgendamentoExplicitoRef.current = true;
 					proximaNomeServidorRef.current = data.proxima || nomeFaixa;

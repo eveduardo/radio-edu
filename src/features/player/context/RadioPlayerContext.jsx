@@ -32,6 +32,35 @@ export const RadioPlayerProvider = ({ children }) => {
 				preload="auto"
 				crossOrigin="anonymous"
 			/>
+			<video
+				ref={radio.wakeVideoRef}
+				muted
+				playsInline
+				loop
+				autoPlay
+				preload="auto"
+				aria-hidden="true"
+				tabIndex={-1}
+				style={{
+					position: "fixed",
+					bottom: "1px",
+					right: "1px",
+					width: "2px",
+					height: "2px",
+					opacity: 0.01,
+					pointerEvents: "none",
+					zIndex: 95,
+				}}
+			>
+				<source
+					src={`${import.meta.env.BASE_URL}nosleep.webm`}
+					type="video/webm"
+				/>
+				<source
+					src={`${import.meta.env.BASE_URL}nosleep.mp4`}
+					type="video/mp4"
+				/>
+			</video>
 		</RadioPlayerContext.Provider>
 	);
 };

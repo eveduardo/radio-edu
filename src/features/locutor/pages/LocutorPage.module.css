@@ -374,6 +374,14 @@
 	gap: 8px;
 }
 
+.dadosPedidoInfo {
+	flex: 1;
+	min-width: 0;
+	padding: 2px 4px;
+	margin: -2px -4px;
+	text-align: left;
+}
+
 .dadosPedidoInfoBtn {
 	flex: 1;
 	min-width: 0;

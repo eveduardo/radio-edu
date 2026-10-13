@@ -47,14 +47,22 @@ export const rebuildRadioCache = async () => {
  * Agenda explicitamente a próxima música a tocar (`radio_sync.php?agendar_proxima=...`).
  *
  * @param {string} trackIdentifier ID, caminho de arquivo ou título da faixa
+ * @param {Object} [options]
+ * @param {boolean} [options.ignorarPedido=false] Quando true, não associa o agendamento a pedidos de ouvintes
  */
-export const scheduleNextTrack = async (trackIdentifier) => {
-	const { data } = await api.get("/radio_sync.php", {
-		params: {
-			agendar_proxima: trackIdentifier,
-			t: Date.now(),
-		},
-	});
+export const scheduleNextTrack = async (
+	trackIdentifier,
+	{ ignorarPedido = false } = {},
+) => {
+	const params = {
+		agendar_proxima: trackIdentifier,
+		t: Date.now(),
+	};
+	if (ignorarPedido) {
+		params.ignorar_pedido = "1";
+	}
+
+	const { data } = await api.get("/radio_sync.php", { params });
 	return data;
 };
 
@@ -151,18 +159,21 @@ export const uploadVoiceChunk = async (
  * @param {number} [retries=2]
  * @returns {Promise<Blob|null>}
  */
-export const fetchVoiceChunkBlob = async (chunkId, retries = 2) => {
+export const fetchVoiceChunkBlob = async (chunkId, retries = 4) => {
 	const url = `${resolveRadioAssetUrl(`voz_stream/chunk_${chunkId}.webm`)}?t=${Date.now()}`;
 
 	for (let attempt = 0; attempt <= retries; attempt++) {
 		try {
-			const response = await fetch(url);
+			const response = await fetch(url, { cache: "no-store" });
 			if (!response.ok) {
 				throw new Error("Chunk ainda não disponível");
 			}
 			const blob = await response.blob();
-			if (blob.size < 500) {
+			if (blob.size < 200) {
 				return null;
+			}
+			if (!blob.type || blob.type === "application/octet-stream") {
+				return new Blob([blob], { type: "audio/webm" });
 			}
 			return blob;
 		} catch {

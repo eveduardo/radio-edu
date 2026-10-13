@@ -21,6 +21,7 @@ export const useRadioPlayer = () => {
 	const playerHoraRef = useRef(null);
 	const playerVozRef = useRef(null);
 	const playerVinhetaRef = useRef(null);
+	const wakeVideoRef = useRef(null);
 
 	const audioCtxRef = useRef(null);
 	const analyserRef = useRef(null);
@@ -81,10 +82,19 @@ export const useRadioPlayer = () => {
 		const player = playerRef.current;
 		const playerVoz = playerVozRef.current;
 
-		if (gainNodeMusica && ctx && ctx.state === "running") {
+		if (
+			gainNodeMusica &&
+			sourceNodeRef.current &&
+			ctx &&
+			ctx.state === "running"
+		) {
 			gainNodeMusica.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
 			if (player) {
-				player.volume = 1;
+				try {
+					player.volume = 1;
+				} catch {
+					// Ignora erro em dispositivos com volume fixo
+				}
 			}
 		} else if (player) {
 			try {
@@ -96,14 +106,9 @@ export const useRadioPlayer = () => {
 
 		if (gainNodeVoz && ctx && ctx.state === "running") {
 			gainNodeVoz.gain.setValueAtTime(volumeFinalMic, ctx.currentTime);
-			if (playerVoz) {
-				try {
-					playerVoz.volume = 1;
-				} catch {
-					// Ignora erro em dispositivos com volume fixo
-				}
-			}
-		} else if (playerVoz) {
+		}
+
+		if (playerVoz) {
 			try {
 				playerVoz.volume = volumeFinalMic;
 			} catch {
@@ -113,17 +118,18 @@ export const useRadioPlayer = () => {
 	}, []);
 
 	/**
-	 * Deve ser chamado apenas dentro de eventos de interação do usuário (click/touchstart/keydown)
-	 * para garantir que o AudioContext nunca seja criado em estado "suspended" (o que silenciaria o <audio>).
+	 * Inicializa o AudioContext e só conecta o MediaElementSource do player principal
+	 * quando o contexto estiver efetivamente em estado "running", evitando silenciar o <audio>.
 	 */
 	const inicializarAudioContext = useCallback(() => {
 		try {
 			const player = playerRef.current;
-			const playerVoz = playerVozRef.current;
 			if (!player) return;
 
 			if (!audioCtxRef.current) {
 				const AudioCtx = window.AudioContext || window.webkitAudioContext;
+				if (!AudioCtx) return;
+
 				const ctx = new AudioCtx();
 				const analyser = ctx.createAnalyser();
 				analyser.fftSize = 64;
@@ -132,20 +138,9 @@ export const useRadioPlayer = () => {
 				const gainNodeMusica = ctx.createGain();
 				const gainNodeVoz = ctx.createGain();
 
-				if (!sourceNodeRef.current) {
-					const sourceMusica = ctx.createMediaElementSource(player);
-					sourceMusica.connect(gainNodeMusica);
-					gainNodeMusica.connect(analyser);
-					analyser.connect(ctx.destination);
-					sourceNodeRef.current = sourceMusica;
-				}
-
-				if (playerVoz && !sourceNodeVozRef.current) {
-					const sourceVoz = ctx.createMediaElementSource(playerVoz);
-					sourceVoz.connect(gainNodeVoz);
-					gainNodeVoz.connect(analyser);
-					sourceNodeVozRef.current = sourceVoz;
-				}
+				gainNodeMusica.connect(analyser);
+				gainNodeVoz.connect(analyser);
+				analyser.connect(ctx.destination);
 
 				audioCtxRef.current = ctx;
 				analyserRef.current = analyser;
@@ -154,20 +149,44 @@ export const useRadioPlayer = () => {
 				dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
 			}
 
-			if (audioCtxRef.current.state === "suspended") {
-				audioCtxRef.current.resume().catch(() => {});
+			const ctx = audioCtxRef.current;
+			const conectarPlayerSeRunning = () => {
+				if (
+					ctx &&
+					ctx.state === "running" &&
+					playerRef.current &&
+					!sourceNodeRef.current &&
+					gainNodeMusicaRef.current
+				) {
+					try {
+						const sourceMusica = ctx.createMediaElementSource(
+							playerRef.current,
+						);
+						sourceMusica.connect(gainNodeMusicaRef.current);
+						sourceNodeRef.current = sourceMusica;
+					} catch {
+						// Ignora caso já esteja conectado
+					}
+				}
+				aplicarVolumesMesa();
+			};
+
+			if (ctx.state === "suspended") {
+				ctx
+					.resume()
+					.then(conectarPlayerSeRunning)
+					.catch(() => {});
+			} else {
+				conectarPlayerSeRunning();
 			}
 
-			aplicarVolumesMesa();
+			ctx.onstatechange = conectarPlayerSeRunning;
 		} catch {
 			// Fallback silencioso caso o navegador bloqueie Web Audio
 		}
 	}, [aplicarVolumesMesa]);
 
-	const tocarProximoBlocoVoz = useCallback(() => {
-		const playerVoz = playerVozRef.current;
-		if (!playerVoz) return;
-
+	const tocarProximoBlocoVoz = useCallback(async () => {
 		if (filaAudioVozRef.current.length === 0) {
 			tocandoVozRef.current = false;
 			aplicarVolumesMesa();
@@ -176,18 +195,64 @@ export const useRadioPlayer = () => {
 
 		tocandoVozRef.current = true;
 		const item = filaAudioVozRef.current.shift();
-		playerVoz.src = item.url;
 		aplicarVolumesMesa();
 
+		let finalizado = false;
 		const limparEProximo = () => {
-			try {
-				URL.revokeObjectURL(item.url);
-			} catch {
-				// ignore
+			if (finalizado) return;
+			finalizado = true;
+			sourceNodeVozRef.current = null;
+			if (item?.url) {
+				try {
+					URL.revokeObjectURL(item.url);
+				} catch {
+					// ignore
+				}
 			}
 			tocarProximoBlocoVoz();
 		};
 
+		// 1. Tenta reproduzir via Web Audio API (AudioBufferSourceNode -> gainNodeVoz)
+		// que funciona em segundo plano no celular sem bloqueio de autoplay por elemento e respeita o fader CH-1
+		const ctx = audioCtxRef.current;
+		if (ctx && ctx.state === "suspended") {
+			await ctx.resume().catch(() => {});
+		}
+
+		if (
+			ctx &&
+			ctx.state === "running" &&
+			gainNodeVozRef.current &&
+			item?.blob
+		) {
+			try {
+				const buffer = await item.blob.arrayBuffer();
+				const audioBuffer = await ctx.decodeAudioData(buffer);
+				if (!estaTocandoRef.current) {
+					limparEProximo();
+					return;
+				}
+				const source = ctx.createBufferSource();
+				source.buffer = audioBuffer;
+				source.connect(gainNodeVozRef.current);
+				sourceNodeVozRef.current = source;
+				source.onended = limparEProximo;
+				source.start(0);
+				return;
+			} catch {
+				// Se decodeAudioData falhar para algum formato, usa o fallback <audio> abaixo
+			}
+		}
+
+		// 2. Fallback via elemento <audio ref={playerVozRef}>
+		const playerVoz = playerVozRef.current;
+		if (!playerVoz || !item?.url) {
+			limparEProximo();
+			return;
+		}
+
+		playerVoz.src = item.url;
+		aplicarVolumesMesa();
 		playerVoz.onended = limparEProximo;
 		playerVoz.onerror = limparEProximo;
 
@@ -477,6 +542,14 @@ export const useRadioPlayer = () => {
 			player?.pause();
 			playerVozRef.current?.pause();
 			playerVinhetaRef.current?.pause();
+			if (sourceNodeVozRef.current) {
+				try {
+					sourceNodeVozRef.current.stop();
+				} catch {
+					// ignore
+				}
+				sourceNodeVozRef.current = null;
+			}
 			filaAudioVozRef.current = [];
 			tocandoVozRef.current = false;
 			setStatusTexto("Em pausa");
@@ -580,7 +653,12 @@ export const useRadioPlayer = () => {
 
 			if (primeiraCargaFirebaseRef.current) {
 				primeiraCargaFirebaseRef.current = false;
-				if (dados.ultimo_chunk) {
+				const chunkRecenteAoVivo =
+					dados.ao_vivo &&
+					dados.ultimo_chunk &&
+					Date.now() - Number(dados.ultimo_chunk) < 8000;
+
+				if (dados.ultimo_chunk && !chunkRecenteAoVivo) {
 					historicoChunksRef.current.add(dados.ultimo_chunk);
 				}
 				if (dados.forcar_troca) {
@@ -589,7 +667,9 @@ export const useRadioPlayer = () => {
 				if (dados.atualizacao_programacao) {
 					ultimaAtualizacaoProgRef.current = dados.atualizacao_programacao;
 				}
-				return;
+				if (!chunkRecenteAoVivo) {
+					return;
+				}
 			}
 
 			if (
@@ -641,7 +721,7 @@ export const useRadioPlayer = () => {
 				fetchVoiceChunkBlob(chunkId).then((blob) => {
 					if (!blob) return;
 					const urlBlob = URL.createObjectURL(blob);
-					filaAudioVozRef.current.push({ url: urlBlob });
+					filaAudioVozRef.current.push({ url: urlBlob, blob });
 
 					if (!tocandoVozRef.current && estaTocandoRef.current) {
 						tocarProximoBlocoVoz();
@@ -658,75 +738,104 @@ export const useRadioPlayer = () => {
 		tocarProximoBlocoVoz,
 	]);
 
-	// WakeLock + MediaSession para manter a tela do celular sempre acesa enquanto a rádio toca
+	// WakeLock API + NoSleep HTML5 Video para manter a tela do celular acesa (inclusive em HTTP local)
 	useEffect(() => {
+		const wakeVideo = wakeVideoRef.current;
+		const player = playerRef.current;
+
+		const aoTimeUpdateWakeVideo = () => {
+			if (wakeVideo && wakeVideo.currentTime > 0.5) {
+				try {
+					wakeVideo.currentTime = Math.random() * 0.25;
+				} catch {
+					// ignore
+				}
+			}
+		};
+
 		const liberarWakeLock = () => {
 			if (wakeLockRef.current) {
 				wakeLockRef.current.release().catch(() => {});
 				wakeLockRef.current = null;
 			}
+			if (wakeVideo && !wakeVideo.paused) {
+				wakeVideo.pause();
+			}
 		};
 
-		const ativarWakeLock = async () => {
-			if (
-				!estaTocandoRef.current ||
-				document.visibilityState !== "visible" ||
-				!("wakeLock" in navigator)
-			) {
+		const manterTelaAcesa = async () => {
+			if (!estaTocandoRef.current || document.visibilityState !== "visible") {
 				return;
 			}
-			if (wakeLockRef.current && !wakeLockRef.current.released) {
-				return;
+
+			// 1. Mantém o vídeo NoSleep ativo (funciona em HTTP e sem exigir clique quando muted+playsInline)
+			if (wakeVideo) {
+				wakeVideo.muted = true;
+				wakeVideo.playsInline = true;
+				if (wakeVideo.paused) {
+					wakeVideo.play().catch(() => {});
+				}
 			}
-			try {
-				const sentinel = await navigator.wakeLock.request("screen");
-				wakeLockRef.current = sentinel;
-				sentinel.addEventListener("release", () => {
-					if (wakeLockRef.current === sentinel) {
-						wakeLockRef.current = null;
+
+			// 2. Solicita WakeLock nativa caso o navegador disponha da API (HTTPS / localhost)
+			if ("wakeLock" in navigator) {
+				if (!wakeLockRef.current || wakeLockRef.current.released) {
+					try {
+						const sentinel = await navigator.wakeLock.request("screen");
+						wakeLockRef.current = sentinel;
+						sentinel.addEventListener("release", () => {
+							if (wakeLockRef.current === sentinel) {
+								wakeLockRef.current = null;
+							}
+						});
+					} catch {
+						// Ignora caso exija gesto adicional
 					}
-				});
-			} catch {
-				// Será solicitado novamente no próximo toque/evento de reprodução
+				}
 			}
 		};
 
 		const aoMudarVisibilidade = () => {
 			if (document.visibilityState === "visible" && estaTocandoRef.current) {
-				ativarWakeLock();
+				manterTelaAcesa();
 			}
 		};
 
-		const player = playerRef.current;
+		wakeVideo?.addEventListener("timeupdate", aoTimeUpdateWakeVideo);
 
 		if (estaTocando) {
-			ativarWakeLock();
+			manterTelaAcesa();
 			document.addEventListener("visibilitychange", aoMudarVisibilidade);
-			window.addEventListener("focus", ativarWakeLock);
-			document.addEventListener("touchstart", ativarWakeLock, {
+			window.addEventListener("focus", manterTelaAcesa);
+			document.addEventListener("touchstart", manterTelaAcesa, {
 				passive: true,
 			});
-			document.addEventListener("click", ativarWakeLock, { passive: true });
-			document.addEventListener("pointerdown", ativarWakeLock, {
+			document.addEventListener("click", manterTelaAcesa, { passive: true });
+			document.addEventListener("pointerdown", manterTelaAcesa, {
 				passive: true,
 			});
-			player?.addEventListener("playing", ativarWakeLock);
+			document.addEventListener("keydown", manterTelaAcesa, { passive: true });
+			player?.addEventListener("playing", manterTelaAcesa);
+			player?.addEventListener("timeupdate", manterTelaAcesa);
 		} else {
 			liberarWakeLock();
 		}
 
 		const keepAliveInterval = estaTocando
-			? setInterval(ativarWakeLock, 15000)
+			? setInterval(manterTelaAcesa, 5000)
 			: null;
 
 		return () => {
 			if (keepAliveInterval) clearInterval(keepAliveInterval);
+			wakeVideo?.removeEventListener("timeupdate", aoTimeUpdateWakeVideo);
 			document.removeEventListener("visibilitychange", aoMudarVisibilidade);
-			window.removeEventListener("focus", ativarWakeLock);
-			document.removeEventListener("touchstart", ativarWakeLock);
-			document.removeEventListener("click", ativarWakeLock);
-			document.removeEventListener("pointerdown", ativarWakeLock);
-			player?.removeEventListener("playing", ativarWakeLock);
+			window.removeEventListener("focus", manterTelaAcesa);
+			document.removeEventListener("touchstart", manterTelaAcesa);
+			document.removeEventListener("click", manterTelaAcesa);
+			document.removeEventListener("pointerdown", manterTelaAcesa);
+			document.removeEventListener("keydown", manterTelaAcesa);
+			player?.removeEventListener("playing", manterTelaAcesa);
+			player?.removeEventListener("timeupdate", manterTelaAcesa);
 			liberarWakeLock();
 		};
 	}, [estaTocando]);
@@ -780,6 +889,7 @@ export const useRadioPlayer = () => {
 		playerHoraRef,
 		playerVozRef,
 		playerVinhetaRef,
+		wakeVideoRef,
 		audioCtxRef,
 		analyserRef,
 		dataArrayRef,
