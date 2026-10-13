@@ -60,19 +60,19 @@ export const VerticalVuMeter = ({
 			if (mode === "mic") {
 				const analyser = micAnalyserRef?.current;
 				const dataArray = micDataArrayRef?.current;
-				if (aoVivo && analyser && dataArray) {
+				if (aoVivo && faderValue > 0 && analyser && dataArray) {
 					analyser.getByteFrequencyData(dataArray);
 					let soma = 0;
 					for (let i = 0; i < dataArray.length; i++) {
 						soma += dataArray[i];
 					}
 					const volReal = soma / dataArray.length / 128;
-					nivel = Math.min(1, volReal * faderValue * 1.6);
+					nivel = Math.min(faderValue, Math.max(0, volReal * faderValue * 1.2));
 				}
 			} else if (faderValue > 0) {
 				const onda = Math.sin(animTick * 1.2) * 0.35 + 0.55;
 				const beat = Math.sin(animTick * 3.5) > 0.6 ? 0.25 : 0;
-				nivel = Math.min(1, Math.max(0, (onda + beat) * faderValue));
+				nivel = Math.min(faderValue, Math.max(0, (onda + beat) * faderValue));
 			}
 
 			desenharVUMeterVertical(ctx, canvas, nivel);

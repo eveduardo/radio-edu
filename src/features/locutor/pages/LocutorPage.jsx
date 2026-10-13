@@ -10,6 +10,7 @@ const LocutorPage = () => {
 		aoVivo,
 		faderMic,
 		faderMusica,
+		ouvindoProgramacao,
 		musicaAtual,
 		proximaAtual,
 		tempoRestanteFormatado,
@@ -19,6 +20,7 @@ const LocutorPage = () => {
 		atualizandoAcervo,
 		avisoModal,
 		confirmacaoModal,
+		monitorAudioRef,
 		micAnalyserRef,
 		micDataArrayRef,
 		setAvisoModal,
@@ -26,6 +28,8 @@ const LocutorPage = () => {
 		handleChangeFaderMic,
 		handleChangeFaderMusica,
 		alternarMicrofone,
+		alternarEscutaProgramacao,
+		monitorarMusicaNoAr,
 		transicaoSuaveProxima,
 		carregarPedidos,
 		carregarAcervo,
@@ -98,6 +102,7 @@ const LocutorPage = () => {
 							</div>
 						</div>
 
+						<div className={styles.infoCanalMusica}>LOCUÇÃO</div>
 						<button
 							type="button"
 							className={clsx(styles.btnCanalMic, aoVivo && styles.ativo)}
@@ -140,6 +145,18 @@ const LocutorPage = () => {
 						</div>
 
 						<div className={styles.infoCanalMusica}>PROGRAMAÇÃO</div>
+						<button
+							type="button"
+							className={clsx(
+								styles.btnCanalMic,
+								ouvindoProgramacao && styles.ativoRetorno,
+							)}
+							onClick={alternarEscutaProgramacao}
+							title="Ligar / Desligar escuta da música que está no ar"
+						>
+							<span>{ouvindoProgramacao ? "🔊" : "🔇"}</span>
+							<span>{ouvindoProgramacao ? "LIG." : "DESL."}</span>
+						</button>
 					</div>
 				</div>
 
@@ -523,6 +540,13 @@ const LocutorPage = () => {
 					<p className={styles.modalAvisoTexto}>{confirmacaoModal?.mensagem}</p>
 				</div>
 			</Modal>
+
+			<audio
+				ref={monitorAudioRef}
+				preload="auto"
+				crossOrigin="anonymous"
+				onEnded={monitorarMusicaNoAr}
+			/>
 		</div>
 	);
 };

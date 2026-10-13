@@ -25,8 +25,10 @@ export const useRadioPlayer = () => {
 	const audioCtxRef = useRef(null);
 	const analyserRef = useRef(null);
 	const gainNodeMusicaRef = useRef(null);
+	const gainNodeVozRef = useRef(null);
 	const dataArrayRef = useRef(null);
 	const sourceNodeRef = useRef(null);
+	const sourceNodeVozRef = useRef(null);
 
 	const estaTocandoRef = useRef(estaTocando);
 	estaTocandoRef.current = estaTocando;
@@ -57,42 +59,53 @@ export const useRadioPlayer = () => {
 
 	const aplicarVolumesMesa = useCallback(() => {
 		const estadoMesa = estadoMesaRef.current;
-		const volMaster = volumeMasterRef.current;
+		const volMaster = Math.max(0, Math.min(1, volumeMasterRef.current));
 
 		const volMusicaMesa =
 			estadoMesa && typeof estadoMesa.musica_volume === "number"
-				? estadoMesa.musica_volume
+				? Math.max(0, Math.min(1, estadoMesa.musica_volume))
 				: 1.0;
 
 		const volMicMesa =
 			estadoMesa && typeof estadoMesa.mic_volume === "number"
-				? estadoMesa.mic_volume
+				? Math.max(0, Math.min(1, estadoMesa.mic_volume))
 				: 1.0;
 
-		const volumeFinalMusica = Math.max(
-			0,
-			Math.min(1, volMaster * volMusicaMesa),
-		);
+		// CH-1 (Mic) e CH-2 (Música) seguem a mesma regra e nunca ultrapassam o volume Master do ouvinte
+		const volumeFinalMusica = Math.min(volMaster, volMaster * volMusicaMesa);
+		const volumeFinalMic = Math.min(volMaster, volMaster * volMicMesa);
 
 		const ctx = audioCtxRef.current;
-		const gainNode = gainNodeMusicaRef.current;
+		const gainNodeMusica = gainNodeMusicaRef.current;
+		const gainNodeVoz = gainNodeVozRef.current;
 		const player = playerRef.current;
+		const playerVoz = playerVozRef.current;
 
-		if (gainNode && ctx && ctx.state === "running") {
-			gainNode.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
+		if (gainNodeMusica && ctx && ctx.state === "running") {
+			gainNodeMusica.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
 			if (player) {
 				player.volume = 1;
 			}
 		} else if (player) {
-			player.volume = volumeFinalMusica;
+			try {
+				player.volume = volumeFinalMusica;
+			} catch {
+				// Ignora erro em dispositivos com volume fixo
+			}
 		}
 
-		if (playerVozRef.current) {
+		if (gainNodeVoz && ctx && ctx.state === "running") {
+			gainNodeVoz.gain.setValueAtTime(volumeFinalMic, ctx.currentTime);
+			if (playerVoz) {
+				try {
+					playerVoz.volume = 1;
+				} catch {
+					// Ignora erro em dispositivos com volume fixo
+				}
+			}
+		} else if (playerVoz) {
 			try {
-				playerVozRef.current.volume = Math.max(
-					0,
-					Math.min(1, volMaster * volMicMesa),
-				);
+				playerVoz.volume = volumeFinalMic;
 			} catch {
 				// Ignora erro em dispositivos com volume fixo
 			}
@@ -106,6 +119,7 @@ export const useRadioPlayer = () => {
 	const inicializarAudioContext = useCallback(() => {
 		try {
 			const player = playerRef.current;
+			const playerVoz = playerVozRef.current;
 			if (!player) return;
 
 			if (!audioCtxRef.current) {
@@ -115,19 +129,28 @@ export const useRadioPlayer = () => {
 				analyser.fftSize = 64;
 				analyser.smoothingTimeConstant = 0.75;
 
-				const gainNode = ctx.createGain();
+				const gainNodeMusica = ctx.createGain();
+				const gainNodeVoz = ctx.createGain();
 
 				if (!sourceNodeRef.current) {
-					const source = ctx.createMediaElementSource(player);
-					source.connect(gainNode);
-					gainNode.connect(analyser);
+					const sourceMusica = ctx.createMediaElementSource(player);
+					sourceMusica.connect(gainNodeMusica);
+					gainNodeMusica.connect(analyser);
 					analyser.connect(ctx.destination);
-					sourceNodeRef.current = source;
+					sourceNodeRef.current = sourceMusica;
+				}
+
+				if (playerVoz && !sourceNodeVozRef.current) {
+					const sourceVoz = ctx.createMediaElementSource(playerVoz);
+					sourceVoz.connect(gainNodeVoz);
+					gainNodeVoz.connect(analyser);
+					sourceNodeVozRef.current = sourceVoz;
 				}
 
 				audioCtxRef.current = ctx;
 				analyserRef.current = analyser;
-				gainNodeMusicaRef.current = gainNode;
+				gainNodeMusicaRef.current = gainNodeMusica;
+				gainNodeVozRef.current = gainNodeVoz;
 				dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
 			}
 
@@ -635,32 +658,95 @@ export const useRadioPlayer = () => {
 		tocarProximoBlocoVoz,
 	]);
 
-	// WakeLock para manter a tela ativa enquanto a rádio toca
+	// WakeLock + MediaSession para manter a tela do celular sempre acesa enquanto a rádio toca
 	useEffect(() => {
-		const ativarWakeLock = async () => {
-			try {
-				if ("wakeLock" in navigator && estaTocando) {
-					wakeLockRef.current = await navigator.wakeLock.request("screen");
-				}
-			} catch {
-				// WakeLock não suportado ou recusado
-			}
-		};
-
-		if (estaTocando) {
-			ativarWakeLock();
-		} else if (wakeLockRef.current) {
-			wakeLockRef.current.release().catch(() => {});
-			wakeLockRef.current = null;
-		}
-
-		return () => {
+		const liberarWakeLock = () => {
 			if (wakeLockRef.current) {
 				wakeLockRef.current.release().catch(() => {});
 				wakeLockRef.current = null;
 			}
 		};
+
+		const ativarWakeLock = async () => {
+			if (
+				!estaTocandoRef.current ||
+				document.visibilityState !== "visible" ||
+				!("wakeLock" in navigator)
+			) {
+				return;
+			}
+			if (wakeLockRef.current && !wakeLockRef.current.released) {
+				return;
+			}
+			try {
+				const sentinel = await navigator.wakeLock.request("screen");
+				wakeLockRef.current = sentinel;
+				sentinel.addEventListener("release", () => {
+					if (wakeLockRef.current === sentinel) {
+						wakeLockRef.current = null;
+					}
+				});
+			} catch {
+				// Será solicitado novamente no próximo toque/evento de reprodução
+			}
+		};
+
+		const aoMudarVisibilidade = () => {
+			if (document.visibilityState === "visible" && estaTocandoRef.current) {
+				ativarWakeLock();
+			}
+		};
+
+		const player = playerRef.current;
+
+		if (estaTocando) {
+			ativarWakeLock();
+			document.addEventListener("visibilitychange", aoMudarVisibilidade);
+			window.addEventListener("focus", ativarWakeLock);
+			document.addEventListener("touchstart", ativarWakeLock, {
+				passive: true,
+			});
+			document.addEventListener("click", ativarWakeLock, { passive: true });
+			document.addEventListener("pointerdown", ativarWakeLock, {
+				passive: true,
+			});
+			player?.addEventListener("playing", ativarWakeLock);
+		} else {
+			liberarWakeLock();
+		}
+
+		const keepAliveInterval = estaTocando
+			? setInterval(ativarWakeLock, 15000)
+			: null;
+
+		return () => {
+			if (keepAliveInterval) clearInterval(keepAliveInterval);
+			document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+			window.removeEventListener("focus", ativarWakeLock);
+			document.removeEventListener("touchstart", ativarWakeLock);
+			document.removeEventListener("click", ativarWakeLock);
+			document.removeEventListener("pointerdown", ativarWakeLock);
+			player?.removeEventListener("playing", ativarWakeLock);
+			liberarWakeLock();
+		};
 	}, [estaTocando]);
+
+	// MediaSession API para integração nativa no celular
+	useEffect(() => {
+		if (!("mediaSession" in navigator)) return;
+		try {
+			navigator.mediaSession.playbackState = estaTocando ? "playing" : "paused";
+			if (typeof window.MediaMetadata !== "undefined") {
+				navigator.mediaSession.metadata = new window.MediaMetadata({
+					title: tituloMusica || "Flash FM",
+					artist: nomeOuvinte || "Flash FM — Ao Vivo",
+					album: proximaFaixa || "Transmissão em tempo real",
+				});
+			}
+		} catch {
+			// Ignora caso o navegador não suporte MediaMetadata
+		}
+	}, [estaTocando, nomeOuvinte, proximaFaixa, tituloMusica]);
 
 	const handleTrackEnded = useCallback(async () => {
 		if (emTransicaoSuaveRef.current) return;

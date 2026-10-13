@@ -6,15 +6,84 @@ import {
 	markRequestAsPlayed,
 	rebuildRadioCache,
 	removeListenerRequest,
+	resolveRadioAssetUrl,
 	scheduleNextTrack,
 	updateMesa,
 	uploadVoiceChunk,
 } from "@/services";
 
+const obterStreamMicrofone = async () => {
+	if (navigator.mediaDevices?.getUserMedia) {
+		const tentativas = [
+			{
+				audio: {
+					echoCancellation: true,
+					noiseSuppression: true,
+					autoGainControl: true,
+				},
+			},
+			{ audio: true },
+		];
+
+		for (const constraints of tentativas) {
+			try {
+				return await navigator.mediaDevices.getUserMedia(constraints);
+			} catch {
+				// Tenta a próxima configuração de áudio
+			}
+		}
+
+		if (navigator.mediaDevices.enumerateDevices) {
+			try {
+				const devices = await navigator.mediaDevices.enumerateDevices();
+				const audioInput = devices.find((d) => d.kind === "audioinput");
+				if (audioInput?.deviceId) {
+					return await navigator.mediaDevices.getUserMedia({
+						audio: { deviceId: { ideal: audioInput.deviceId } },
+					});
+				}
+			} catch {
+				// ignore
+			}
+		}
+	}
+
+	const legacyGetUserMedia =
+		navigator.getUserMedia ||
+		navigator.webkitGetUserMedia ||
+		navigator.mozGetUserMedia;
+
+	if (legacyGetUserMedia) {
+		try {
+			return await new Promise((resolve, reject) => {
+				legacyGetUserMedia.call(navigator, { audio: true }, resolve, reject);
+			});
+		} catch {
+			return null;
+		}
+	}
+
+	return null;
+};
+
+const escolherMimeGravacao = () => {
+	if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) {
+		return "";
+	}
+	const candidatos = [
+		"audio/webm;codecs=opus",
+		"audio/webm",
+		"audio/mp4",
+		"audio/ogg;codecs=opus",
+	];
+	return candidatos.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+};
+
 export const useLocutorMesa = () => {
 	const [aoVivo, setAoVivo] = useState(false);
 	const [faderMic, setFaderMic] = useState(1);
 	const [faderMusica, setFaderMusica] = useState(1);
+	const [ouvindoProgramacao, setOuvindoProgramacao] = useState(false);
 
 	const [musicaAtual, setMusicaAtual] = useState("A carregar faixa...");
 	const [proximaAtual, setProximaAtual] = useState("A seguir: --");
@@ -34,11 +103,15 @@ export const useLocutorMesa = () => {
 	faderMicRef.current = faderMic;
 	const faderMusicaRef = useRef(faderMusica);
 	faderMusicaRef.current = faderMusica;
+	const ouvindoProgramacaoRef = useRef(ouvindoProgramacao);
+	ouvindoProgramacaoRef.current = ouvindoProgramacao;
 	const transicaoEmAndamentoRef = useRef(transicaoEmAndamento);
 	transicaoEmAndamentoRef.current = transicaoEmAndamento;
 	const pedidosRef = useRef(pedidos);
 	pedidosRef.current = pedidos;
 
+	const monitorAudioRef = useRef(null);
+	const urlFaixaNoArRef = useRef("");
 	const proximaNomeServidorRef = useRef("");
 	const temAgendamentoExplicitoRef = useRef(false);
 
@@ -59,13 +132,23 @@ export const useLocutorMesa = () => {
 	const offsetAtualRef = useRef(0);
 	const acervoMusicasGlobalRef = useRef([]);
 
+	const aplicarVolumeMonitor = useCallback((vol) => {
+		const audio = monitorAudioRef.current;
+		if (!audio) return;
+		try {
+			audio.volume = Math.max(0, Math.min(1, vol));
+		} catch {
+			// ignore
+		}
+	}, []);
+
 	const sincronizarMesaFirebase = useCallback((imediato = false) => {
 		const enviar = () => {
 			updateMesa({
 				ao_vivo: aoVivoRef.current,
-				mic_volume: faderMicRef.current,
+				mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
 				musica_tocando: true,
-				musica_volume: faderMusicaRef.current,
+				musica_volume: Math.max(0, Math.min(1, faderMusicaRef.current)),
 			}).catch(() => {});
 		};
 
@@ -82,7 +165,7 @@ export const useLocutorMesa = () => {
 
 	const handleChangeFaderMic = useCallback(
 		(val, imediato = false) => {
-			const num = parseFloat(val);
+			const num = Math.max(0, Math.min(1, parseFloat(val)));
 			faderMicRef.current = num;
 			setFaderMic(num);
 			sincronizarMesaFirebase(imediato);
@@ -92,26 +175,38 @@ export const useLocutorMesa = () => {
 
 	const handleChangeFaderMusica = useCallback(
 		(val, imediato = false) => {
-			const num = parseFloat(val);
+			const num = Math.max(0, Math.min(1, parseFloat(val)));
 			faderMusicaRef.current = num;
 			setFaderMusica(num);
+			aplicarVolumeMonitor(num);
 			sincronizarMesaFirebase(imediato);
 		},
-		[sincronizarMesaFirebase],
+		[aplicarVolumeMonitor, sincronizarMesaFirebase],
 	);
 
 	const iniciarNovoBloco = useCallback(() => {
 		if (!aoVivoRef.current || !streamMicRef.current) return;
+		if (typeof MediaRecorder === "undefined") return;
 
 		chunksAtuaisRef.current = [];
-		const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-			? "audio/webm;codecs=opus"
-			: "audio/webm";
+		const mime = escolherMimeGravacao();
 
-		const gravador = new MediaRecorder(streamMicRef.current, {
-			mimeType: mime,
-			audioBitsPerSecond: 64000,
-		});
+		let gravador;
+		try {
+			gravador = mime
+				? new MediaRecorder(streamMicRef.current, {
+						mimeType: mime,
+						audioBitsPerSecond: 64000,
+					})
+				: new MediaRecorder(streamMicRef.current);
+		} catch {
+			try {
+				gravador = new MediaRecorder(streamMicRef.current);
+			} catch {
+				return;
+			}
+		}
+
 		gravadorMediaRef.current = gravador;
 
 		gravador.ondataavailable = (e) => {
@@ -122,7 +217,9 @@ export const useLocutorMesa = () => {
 
 		gravador.onstop = () => {
 			if (chunksAtuaisRef.current.length > 0) {
-				const audioBlob = new Blob(chunksAtuaisRef.current, { type: mime });
+				const audioBlob = new Blob(chunksAtuaisRef.current, {
+					type: mime || "audio/webm",
+				});
 				chunksAtuaisRef.current = [];
 
 				if (audioBlob.size > 2000) {
@@ -136,15 +233,19 @@ export const useLocutorMesa = () => {
 				}
 			}
 
-			if (aoVivoRef.current) {
+			if (aoVivoRef.current && streamMicRef.current) {
 				iniciarNovoBloco();
 			}
 		};
 
-		gravador.start();
-		inicioGravacaoBlocoRef.current = Date.now();
-		timestampUltimoSomRef.current = Date.now();
-		gravandoBlocoRef.current = true;
+		try {
+			gravador.start();
+			inicioGravacaoBlocoRef.current = Date.now();
+			timestampUltimoSomRef.current = Date.now();
+			gravandoBlocoRef.current = true;
+		} catch {
+			// ignore
+		}
 	}, []);
 
 	const monitorarAtividadeVoz = useCallback(() => {
@@ -177,7 +278,11 @@ export const useLocutorMesa = () => {
 				gravadorMediaRef.current &&
 				gravadorMediaRef.current.state !== "inactive"
 			) {
-				gravadorMediaRef.current.stop();
+				try {
+					gravadorMediaRef.current.stop();
+				} catch {
+					// ignore
+				}
 			}
 		}
 
@@ -197,7 +302,11 @@ export const useLocutorMesa = () => {
 			gravadorMediaRef.current &&
 			gravadorMediaRef.current.state !== "inactive"
 		) {
-			gravadorMediaRef.current.stop();
+			try {
+				gravadorMediaRef.current.stop();
+			} catch {
+				// ignore
+			}
 		}
 
 		if (streamMicRef.current) {
@@ -217,42 +326,40 @@ export const useLocutorMesa = () => {
 
 	const alternarMicrofone = useCallback(async () => {
 		if (!aoVivoRef.current) {
+			const stream = await obterStreamMicrofone();
+
 			try {
-				const stream = await navigator.mediaDevices.getUserMedia({
-					audio: {
-						echoCancellation: true,
-						noiseSuppression: true,
-						autoGainControl: true,
-						channelCount: 1,
-					},
-				});
-
 				const AudioCtx = window.AudioContext || window.webkitAudioContext;
-				const ctx = new AudioCtx();
-				const analyser = ctx.createAnalyser();
-				analyser.fftSize = 64;
-				const dataArray = new Uint8Array(analyser.frequencyBinCount);
+				if (AudioCtx) {
+					const ctx = new AudioCtx();
+					if (ctx.state === "suspended") {
+						ctx.resume().catch(() => {});
+					}
+					const analyser = ctx.createAnalyser();
+					analyser.fftSize = 64;
+					const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-				const micSource = ctx.createMediaStreamSource(stream);
-				micSource.connect(analyser);
+					if (stream) {
+						const micSource = ctx.createMediaStreamSource(stream);
+						micSource.connect(analyser);
+						streamMicRef.current = stream;
+					}
 
-				streamMicRef.current = stream;
-				micAudioCtxRef.current = ctx;
-				micAnalyserRef.current = analyser;
-				micDataArrayRef.current = dataArray;
+					micAudioCtxRef.current = ctx;
+					micAnalyserRef.current = analyser;
+					micDataArrayRef.current = dataArray;
+				}
+			} catch {
+				// Prossegue ativando o canal CH-1 mesmo sem Web Audio
+			}
 
-				aoVivoRef.current = true;
-				setAoVivo(true);
-				sincronizarMesaFirebase(true);
+			aoVivoRef.current = true;
+			setAoVivo(true);
+			sincronizarMesaFirebase(true);
 
+			if (streamMicRef.current) {
 				iniciarNovoBloco();
 				monitorarAtividadeVoz();
-			} catch {
-				setAvisoModal({
-					icone: "⚠️",
-					titulo: "Microfone Indisponível",
-					mensagem: "Permissão de microfone negada ou dispositivo indisponível.",
-				});
 			}
 		} else {
 			desligarMicrofone();
@@ -272,19 +379,87 @@ export const useLocutorMesa = () => {
 		};
 	}, [desligarMicrofone]);
 
-	const aplicarDadosSyncNaMesa = useCallback((data) => {
-		if (data?.faixa_atual) {
-			setMusicaAtual(data.faixa_atual.nome || "Sem título");
-			const nomeProx = data.proxima_faixa?.nome || "";
-			proximaNomeServidorRef.current = nomeProx;
-			setProximaAtual(`A seguir: ${nomeProx || "--"}`);
-			duracaoAtualRef.current = data.faixa_atual.duracao || 180;
-			offsetAtualRef.current = data.offset_segundos || 0;
-			setTempoRestanteSeg(
-				Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
-			);
+	const aplicarDadosSyncNaMesa = useCallback(
+		(data) => {
+			if (data?.faixa_atual) {
+				setMusicaAtual(data.faixa_atual.nome || "Sem título");
+				const nomeProx = data.proxima_faixa?.nome || "";
+				proximaNomeServidorRef.current = nomeProx;
+				setProximaAtual(`A seguir: ${nomeProx || "--"}`);
+				duracaoAtualRef.current = data.faixa_atual.duracao || 180;
+				offsetAtualRef.current = data.offset_segundos || 0;
+				setTempoRestanteSeg(
+					Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
+				);
+
+				const novaUrl = resolveRadioAssetUrl(data.faixa_atual.url || "");
+				const audio = monitorAudioRef.current;
+
+				if (novaUrl) {
+					const trocouFaixa = urlFaixaNoArRef.current !== novaUrl;
+					urlFaixaNoArRef.current = novaUrl;
+
+					if (ouvindoProgramacaoRef.current && audio) {
+						if (trocouFaixa || !audio.src || audio.paused) {
+							audio.src = novaUrl;
+							aplicarVolumeMonitor(faderMusicaRef.current);
+							const offset = Math.max(0, data.offset_segundos || 0);
+							const posicionar = () => {
+								if (offset > 2) {
+									try {
+										audio.currentTime = offset;
+									} catch {
+										// ignore
+									}
+								}
+							};
+							if (audio.readyState >= 1) {
+								posicionar();
+							} else {
+								audio.addEventListener("loadedmetadata", posicionar, {
+									once: true,
+								});
+							}
+							audio.play().catch(() => {});
+						} else if (
+							audio.readyState >= 2 &&
+							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 4
+						) {
+							try {
+								audio.currentTime = Math.max(0, data.offset_segundos || 0);
+							} catch {
+								// ignore
+							}
+						}
+					}
+				}
+			}
+		},
+		[aplicarVolumeMonitor],
+	);
+
+	const alternarEscutaProgramacao = useCallback(async () => {
+		const audio = monitorAudioRef.current;
+		if (!ouvindoProgramacaoRef.current) {
+			ouvindoProgramacaoRef.current = true;
+			setOuvindoProgramacao(true);
+			aplicarVolumeMonitor(faderMusicaRef.current);
+
+			try {
+				const data = await fetchRadioSync();
+				aplicarDadosSyncNaMesa(data);
+			} catch {
+				if (audio && urlFaixaNoArRef.current) {
+					audio.src = urlFaixaNoArRef.current;
+					audio.play().catch(() => {});
+				}
+			}
+		} else {
+			ouvindoProgramacaoRef.current = false;
+			setOuvindoProgramacao(false);
+			audio?.pause();
 		}
-	}, []);
+	}, [aplicarDadosSyncNaMesa, aplicarVolumeMonitor]);
 
 	const monitorarMusicaNoAr = useCallback(async () => {
 		try {
@@ -361,6 +536,7 @@ export const useLocutorMesa = () => {
 			const novoVol = Number(Math.max(0, volInicial - decremento * i).toFixed(2));
 			faderMusicaRef.current = novoVol;
 			setFaderMusica(novoVol);
+			aplicarVolumeMonitor(novoVol);
 		}
 
 		await new Promise((r) => setTimeout(r, 200));
@@ -372,12 +548,13 @@ export const useLocutorMesa = () => {
 			);
 			faderMusicaRef.current = volSubindo;
 			setFaderMusica(volSubindo);
+			aplicarVolumeMonitor(volSubindo);
 		}
 
 		sincronizarMesaFirebase(true);
 		transicaoEmAndamentoRef.current = false;
 		setTransicaoEmAndamento(false);
-	}, [aplicarDadosSyncNaMesa, sincronizarMesaFirebase]);
+	}, [aplicarDadosSyncNaMesa, aplicarVolumeMonitor, sincronizarMesaFirebase]);
 
 	const carregarPedidos = useCallback(async () => {
 		try {
@@ -562,6 +739,7 @@ export const useLocutorMesa = () => {
 		aoVivo,
 		faderMic,
 		faderMusica,
+		ouvindoProgramacao,
 		musicaAtual,
 		proximaAtual,
 		tempoRestanteFormatado: `${minutosRestantes}:${segundosRestantes}`,
@@ -571,6 +749,7 @@ export const useLocutorMesa = () => {
 		atualizandoAcervo,
 		avisoModal,
 		confirmacaoModal,
+		monitorAudioRef,
 		micAnalyserRef,
 		micDataArrayRef,
 		setAvisoModal,
@@ -578,6 +757,8 @@ export const useLocutorMesa = () => {
 		handleChangeFaderMic,
 		handleChangeFaderMusica,
 		alternarMicrofone,
+		alternarEscutaProgramacao,
+		monitorarMusicaNoAr,
 		transicaoSuaveProxima,
 		carregarPedidos,
 		carregarAcervo,
