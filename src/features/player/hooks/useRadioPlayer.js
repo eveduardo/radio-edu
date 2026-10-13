@@ -25,8 +25,10 @@ export const useRadioPlayer = () => {
 
 	const audioCtxRef = useRef(null);
 	const analyserRef = useRef(null);
+	const gainNodeMusicaRef = useRef(null);
 	const gainNodeVozRef = useRef(null);
 	const dataArrayRef = useRef(null);
+	const sourceNodeMusicaRef = useRef(null);
 	const sourceNodeVozRef = useRef(null);
 
 	const estaTocandoRef = useRef(estaTocando);
@@ -80,6 +82,20 @@ export const useRadioPlayer = () => {
 		);
 		const volumeFinalMic = Math.max(0, Math.min(1, volMaster * volMicMesa));
 
+		const ctx = audioCtxRef.current;
+		const gainNodeMusica = gainNodeMusicaRef.current;
+		if (gainNodeMusica && ctx) {
+			try {
+				if (ctx.state === "running") {
+					gainNodeMusica.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
+				} else {
+					gainNodeMusica.gain.value = volumeFinalMusica;
+				}
+			} catch {
+				gainNodeMusica.gain.value = volumeFinalMusica;
+			}
+		}
+
 		const player = playerRef.current;
 		if (player) {
 			try {
@@ -89,7 +105,6 @@ export const useRadioPlayer = () => {
 			}
 		}
 
-		const ctx = audioCtxRef.current;
 		const gainNodeVoz = gainNodeVozRef.current;
 		if (gainNodeVoz && ctx && ctx.state === "running") {
 			gainNodeVoz.gain.setValueAtTime(volumeFinalMic, ctx.currentTime);
@@ -115,9 +130,9 @@ export const useRadioPlayer = () => {
 	}, []);
 
 	/**
-	 * Inicializa o AudioContext para canais de locução Web Audio e analyser do VU Meter.
-	 * O player principal de música permanece como <audio> nativo HTML5, garantindo
-	 * execução ininterrupta em segundo plano no celular quando a tela apaga.
+	 * Inicializa o AudioContext e conecta o player ao AnalyserNode Web Audio.
+	 * O áudio da música alimenta o analisador de frequência em tempo real (VU meter / UV),
+	 * acompanhando precisamente o ritmo, graves e agudos da música tocada.
 	 */
 	const inicializarAudioContext = useCallback(() => {
 		try {
@@ -127,15 +142,19 @@ export const useRadioPlayer = () => {
 
 				const ctx = new AudioCtx();
 				const analyser = ctx.createAnalyser();
-				analyser.fftSize = 64;
-				analyser.smoothingTimeConstant = 0.75;
+				analyser.fftSize = 256;
+				analyser.smoothingTimeConstant = 0.65;
 
+				const gainNodeMusica = ctx.createGain();
 				const gainNodeVoz = ctx.createGain();
+
+				gainNodeMusica.connect(analyser);
 				gainNodeVoz.connect(analyser);
 				analyser.connect(ctx.destination);
 
 				audioCtxRef.current = ctx;
 				analyserRef.current = analyser;
+				gainNodeMusicaRef.current = gainNodeMusica;
 				gainNodeVozRef.current = gainNodeVoz;
 				dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
 			}
@@ -144,6 +163,24 @@ export const useRadioPlayer = () => {
 			if (ctx && ctx.state === "suspended") {
 				ctx.resume().catch(() => {});
 			}
+
+			// Conecta o elemento <audio> principal ao grafo Web Audio para análise real de frequência (UV)
+			const player = playerRef.current;
+			if (
+				ctx &&
+				player &&
+				!sourceNodeMusicaRef.current &&
+				gainNodeMusicaRef.current
+			) {
+				try {
+					const source = ctx.createMediaElementSource(player);
+					source.connect(gainNodeMusicaRef.current);
+					sourceNodeMusicaRef.current = source;
+				} catch {
+					// Já conectado anteriormente
+				}
+			}
+
 			aplicarVolumesMesa();
 		} catch {
 			// Fallback silencioso caso o navegador bloqueie Web Audio
@@ -231,6 +268,14 @@ export const useRadioPlayer = () => {
 			if (!playerHora) return;
 
 			ultimaHoraTocadaRef.current = horario;
+			const ctx = audioCtxRef.current;
+			const gainNodeMusica = gainNodeMusicaRef.current;
+			if (gainNodeMusica && ctx && ctx.state === "running") {
+				gainNodeMusica.gain.setValueAtTime(
+					0.2 * volumeMasterRef.current,
+					ctx.currentTime,
+				);
+			}
 			if (playerRef.current) {
 				try {
 					playerRef.current.volume = 0.2 * volumeMasterRef.current;
@@ -431,11 +476,16 @@ export const useRadioPlayer = () => {
 			const passos = 7;
 			const tempoPasso = 90;
 			const player = playerRef.current;
+			const ctx = audioCtxRef.current;
+			const gainNodeMusica = gainNodeMusicaRef.current;
 			const volAtual = player?.volume ?? 1;
 
 			for (let i = 1; i <= passos; i++) {
 				await new Promise((r) => setTimeout(r, tempoPasso));
 				const v = Math.max(0, volAtual - (volAtual / passos) * i);
+				if (gainNodeMusica && ctx && ctx.state === "running") {
+					gainNodeMusica.gain.setValueAtTime(v, ctx.currentTime);
+				}
 				if (player) {
 					try {
 						player.volume = v;
@@ -459,6 +509,9 @@ export const useRadioPlayer = () => {
 					),
 				);
 				const v = Math.min(volAlvo, (volAlvo / passos) * i);
+				if (gainNodeMusica && ctx && ctx.state === "running") {
+					gainNodeMusica.gain.setValueAtTime(v, ctx.currentTime);
+				}
 				if (player) {
 					try {
 						player.volume = v;
@@ -612,9 +665,12 @@ export const useRadioPlayer = () => {
 			"keydown",
 			"pointermove",
 			"mousemove",
+			"mouseenter",
 			"wheel",
 			"scroll",
 			"focus",
+			"pageshow",
+			"visibilitychange",
 		];
 
 		eventos.forEach((evt) =>
@@ -628,6 +684,47 @@ export const useRadioPlayer = () => {
 			eventos.forEach((evt) =>
 				window.removeEventListener(evt, desbloquear, { capture: true }),
 			);
+		};
+	}, [aplicarVolumesMesa, inicializarAudioContext]);
+
+	// Tentativa imediata de autoplay e retomada de AudioContext no mount e no foco
+	useEffect(() => {
+		inicializarAudioContext();
+
+		const tentarTocar = () => {
+			inicializarAudioContext();
+			const player = playerRef.current;
+			if (player && estaTocandoRef.current) {
+				player.muted = false;
+				aplicarVolumesMesa();
+				if (
+					player.src &&
+					player.src !== window.location.href &&
+					estadoMesaRef.current?.musica_tocando !== false
+				) {
+					player.play().catch(() => {});
+				}
+			}
+			if (audioCtxRef.current?.state === "suspended") {
+				audioCtxRef.current.resume().catch(() => {});
+			}
+		};
+
+		tentarTocar();
+		window.addEventListener("load", tentarTocar, { once: true });
+		window.addEventListener("pageshow", tentarTocar);
+		window.addEventListener("focus", tentarTocar);
+
+		const handleVisibility = () => {
+			if (document.visibilityState === "visible") tentarTocar();
+		};
+		document.addEventListener("visibilitychange", handleVisibility);
+
+		return () => {
+			window.removeEventListener("load", tentarTocar);
+			window.removeEventListener("pageshow", tentarTocar);
+			window.removeEventListener("focus", tentarTocar);
+			document.removeEventListener("visibilitychange", handleVisibility);
 		};
 	}, [aplicarVolumesMesa, inicializarAudioContext]);
 
