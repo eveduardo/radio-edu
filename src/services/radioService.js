@@ -34,6 +34,22 @@ export const fetchGenresCatalog = async () => {
 };
 
 /**
+ * Lista o catálogo de vinhetas, jingles e prefixos agrupado por subpasta (`radio_sync.php?listar_vinhetas=1`).
+ *
+ * @returns {Promise<Record<string, Array<{id: string, arquivo: string, nome: string, categoria: string, url: string}>>>}
+ */
+export const fetchVinhetasCatalog = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { listar_vinhetas: "1", t: Date.now() },
+	});
+
+	if (data && typeof data === "object" && !Array.isArray(data)) {
+		return data;
+	}
+	return {};
+};
+
+/**
  * Força a reconstrução do `playlist_cache.json` a partir da pasta `/musicas/` (`atualizar_acervo.php`).
  */
 export const rebuildRadioCache = async () => {

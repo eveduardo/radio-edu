@@ -25,10 +25,10 @@ const desenharVUMeterVertical = (ctx, canvas, intensidade) => {
 };
 
 /**
- * VU Meter vertical de 14 LEDs usado nos canais de Microfone e Música da Mesa Master.
+ * VU Meter vertical de 14 LEDs usado nos canais de Microfone, Música e Vinheta da Mesa Master.
  *
  * @param {Object} props
- * @param {"mic" | "musica"} props.mode
+ * @param {"mic" | "musica" | "vinheta"} props.mode
  * @param {boolean} [props.aoVivo]
  * @param {number} props.faderValue
  * @param {React.RefObject<AnalyserNode>} [props.micAnalyserRef]
@@ -68,6 +68,12 @@ export const VerticalVuMeter = ({
 					}
 					const volReal = soma / dataArray.length / 128;
 					nivel = Math.min(faderValue, Math.max(0, volReal * faderValue * 1.2));
+				}
+			} else if (mode === "vinheta") {
+				if (aoVivo && faderValue > 0) {
+					const onda = Math.sin(animTick * 1.8) * 0.35 + 0.55;
+					const beat = Math.sin(animTick * 4.2) > 0.5 ? 0.25 : 0;
+					nivel = Math.min(faderValue, Math.max(0, (onda + beat) * faderValue));
 				}
 			} else if (faderValue > 0) {
 				const onda = Math.sin(animTick * 1.2) * 0.35 + 0.55;

@@ -3,6 +3,7 @@ import {
 	fetchGenresCatalog,
 	fetchListenerRequests,
 	fetchRadioSync,
+	fetchVinhetasCatalog,
 	markRequestAsPlayed,
 	rebuildRadioCache,
 	removeListenerRequest,
@@ -83,7 +84,9 @@ export const useLocutorMesa = () => {
 	const [aoVivo, setAoVivo] = useState(false);
 	const [faderMic, setFaderMic] = useState(1);
 	const [faderMusica, setFaderMusica] = useState(1);
+	const [faderVinheta, setFaderVinheta] = useState(1);
 	const [ouvindoProgramacao, setOuvindoProgramacao] = useState(false);
+	const [ouvindoVinheta, setOuvindoVinheta] = useState(false);
 
 	const [musicaAtual, setMusicaAtual] = useState("A carregar faixa...");
 	const [proximaAtual, setProximaAtual] = useState("A seguir: --");
@@ -92,6 +95,9 @@ export const useLocutorMesa = () => {
 
 	const [pedidos, setPedidos] = useState([]);
 	const [mapaGeneros, setMapaGeneros] = useState({});
+	const [mapaVinhetas, setMapaVinhetas] = useState({});
+	const [vinhetaSelecionada, setVinhetaSelecionada] = useState(null);
+	const [vinhetaNoArId, setVinhetaNoArId] = useState(null);
 	const [atualizandoAcervo, setAtualizandoAcervo] = useState(false);
 
 	const [avisoModal, setAvisoModal] = useState(null);
@@ -103,14 +109,21 @@ export const useLocutorMesa = () => {
 	faderMicRef.current = faderMic;
 	const faderMusicaRef = useRef(faderMusica);
 	faderMusicaRef.current = faderMusica;
+	const faderVinhetaRef = useRef(faderVinheta);
+	faderVinhetaRef.current = faderVinheta;
 	const ouvindoProgramacaoRef = useRef(ouvindoProgramacao);
 	ouvindoProgramacaoRef.current = ouvindoProgramacao;
+	const ouvindoVinhetaRef = useRef(ouvindoVinheta);
+	ouvindoVinhetaRef.current = ouvindoVinheta;
+	const vinhetaSelecionadaRef = useRef(vinhetaSelecionada);
+	vinhetaSelecionadaRef.current = vinhetaSelecionada;
 	const transicaoEmAndamentoRef = useRef(transicaoEmAndamento);
 	transicaoEmAndamentoRef.current = transicaoEmAndamento;
 	const pedidosRef = useRef(pedidos);
 	pedidosRef.current = pedidos;
 
 	const monitorAudioRef = useRef(null);
+	const vinhetaPreviewAudioRef = useRef(null);
 	const urlFaixaNoArRef = useRef("");
 	const proximaNomeServidorRef = useRef("");
 	const temAgendamentoExplicitoRef = useRef(false);
@@ -134,6 +147,16 @@ export const useLocutorMesa = () => {
 
 	const aplicarVolumeMonitor = useCallback((vol) => {
 		const audio = monitorAudioRef.current;
+		if (!audio) return;
+		try {
+			audio.volume = Math.max(0, Math.min(1, vol));
+		} catch {
+			// ignore
+		}
+	}, []);
+
+	const aplicarVolumeVinhetaPreview = useCallback((vol) => {
+		const audio = vinhetaPreviewAudioRef.current;
 		if (!audio) return;
 		try {
 			audio.volume = Math.max(0, Math.min(1, vol));
@@ -182,6 +205,17 @@ export const useLocutorMesa = () => {
 			sincronizarMesaFirebase(imediato);
 		},
 		[aplicarVolumeMonitor, sincronizarMesaFirebase],
+	);
+
+	// CH-3: controla exclusivamente o volume de pré-escuta de vinhetas do locutor
+	const handleChangeFaderVinheta = useCallback(
+		(val) => {
+			const num = Math.max(0, Math.min(1, parseFloat(val)));
+			faderVinhetaRef.current = num;
+			setFaderVinheta(num);
+			aplicarVolumeVinhetaPreview(num);
+		},
+		[aplicarVolumeVinhetaPreview],
 	);
 
 	// Redireciona automaticamente no PC de IP de rede (ex.: http://192.168.x.x:5173/locutor)
@@ -631,19 +665,147 @@ export const useLocutorMesa = () => {
 		}
 	}, []);
 
+	const carregarVinhetas = useCallback(async () => {
+		try {
+			const vinhetas = await fetchVinhetasCatalog();
+			setMapaVinhetas(vinhetas);
+
+			if (!vinhetaSelecionadaRef.current) {
+				const primeiraLista = Object.values(vinhetas).find(
+					(arr) => Array.isArray(arr) && arr.length > 0,
+				);
+				if (primeiraLista?.[0]) {
+					setVinhetaSelecionada(primeiraLista[0]);
+				}
+			}
+		} catch {
+			setMapaVinhetas({});
+		}
+	}, []);
+
 	useEffect(() => {
 		carregarAcervo();
-	}, [carregarAcervo]);
+		carregarVinhetas();
+	}, [carregarAcervo, carregarVinhetas]);
+
+	const pararEscutaVinheta = useCallback(() => {
+		const audio = vinhetaPreviewAudioRef.current;
+		if (audio) {
+			audio.pause();
+			try {
+				audio.currentTime = 0;
+			} catch {
+				// ignore
+			}
+		}
+		ouvindoVinhetaRef.current = false;
+		setOuvindoVinheta(false);
+	}, []);
+
+	const ouvirVinhetaNoCanal = useCallback(
+		(vinheta) => {
+			if (!vinheta) return;
+			const audio = vinhetaPreviewAudioRef.current;
+			if (!audio) return;
+
+			if (
+				ouvindoVinhetaRef.current &&
+				vinhetaSelecionadaRef.current?.id === vinheta.id
+			) {
+				pararEscutaVinheta();
+				return;
+			}
+
+			vinhetaSelecionadaRef.current = vinheta;
+			setVinhetaSelecionada(vinheta);
+
+			const url = resolveRadioAssetUrl(vinheta.url || vinheta.arquivo || "");
+			if (!url) return;
+
+			audio.src = url;
+			aplicarVolumeVinhetaPreview(faderVinhetaRef.current);
+			ouvindoVinhetaRef.current = true;
+			setOuvindoVinheta(true);
+
+			audio.play().catch(() => {
+				ouvindoVinhetaRef.current = false;
+				setOuvindoVinheta(false);
+			});
+		},
+		[aplicarVolumeVinhetaPreview, pararEscutaVinheta],
+	);
+
+	const alternarEscutaVinhetaCanal = useCallback(() => {
+		if (ouvindoVinhetaRef.current) {
+			pararEscutaVinheta();
+			return;
+		}
+
+		const alvo = vinhetaSelecionadaRef.current;
+		if (alvo) {
+			ouvirVinhetaNoCanal(alvo);
+		} else {
+			setAvisoModal({
+				icone: "🎧",
+				titulo: "Pré-escuta CH-3",
+				mensagem:
+					"Selecione uma vinheta, jingle ou prefixo nas subpastas de Vinhetas abaixo para ouvir no CH-3.",
+			});
+		}
+	}, [ouvirVinhetaNoCanal, pararEscutaVinheta]);
+
+	const liberarVinhetaNoAr = useCallback(
+		async (vinhetaAlvo = null) => {
+			const alvo = vinhetaAlvo || vinhetaSelecionadaRef.current;
+			if (!alvo) {
+				setAvisoModal({
+					icone: "📡",
+					titulo: "Nenhuma Vinheta Selecionada",
+					mensagem:
+						"Escolha uma vinheta nas subpastas abaixo antes de liberar para o ar.",
+				});
+				return;
+			}
+
+			vinhetaSelecionadaRef.current = alvo;
+			setVinhetaSelecionada(alvo);
+
+			// Se estava apenas na pré-escuta, encerra ou reinicia sincronizado com o ar
+			try {
+				await updateMesa({
+					vinheta_ativa: {
+						arquivo: alvo.arquivo,
+						url: alvo.url || alvo.arquivo,
+						nome: alvo.nome,
+						timestamp: Date.now(),
+					},
+				});
+
+				setVinhetaNoArId(alvo.id);
+				setTimeout(() => {
+					setVinhetaNoArId((atual) => (atual === alvo.id ? null : atual));
+				}, 4000);
+			} catch {
+				setAvisoModal({
+					icone: "⚠️",
+					titulo: "Erro",
+					mensagem: "Não foi possível disparar a vinheta no ar.",
+				});
+			}
+		},
+		[],
+	);
 
 	const atualizarAcervo = useCallback(async () => {
 		setAtualizandoAcervo(true);
 		try {
 			await rebuildRadioCache();
 			await carregarAcervo();
+			await carregarVinhetas();
 			setAvisoModal({
 				icone: "✅",
 				titulo: "Acervo Atualizado",
-				mensagem: "O cache de músicas e gêneros foi reindexado com sucesso!",
+				mensagem: "O cache de músicas, gêneros e vinhetas foi atualizado!",
 			});
 		} catch {
 			setAvisoModal({
@@ -654,7 +816,7 @@ export const useLocutorMesa = () => {
 		} finally {
 			setAtualizandoAcervo(false);
 		}
-	}, [carregarAcervo]);
+	}, [carregarAcervo, carregarVinhetas]);
 
 	const atenderPedido = useCallback(
 		async (pedido, tocarAgora = false) => {
@@ -784,29 +946,41 @@ export const useLocutorMesa = () => {
 		aoVivo,
 		faderMic,
 		faderMusica,
+		faderVinheta,
 		ouvindoProgramacao,
+		ouvindoVinheta,
 		musicaAtual,
 		proximaAtual,
 		tempoRestanteFormatado: `${minutosRestantes}:${segundosRestantes}`,
 		transicaoEmAndamento,
 		pedidos,
 		mapaGeneros,
+		mapaVinhetas,
+		vinhetaSelecionada,
+		vinhetaNoArId,
 		atualizandoAcervo,
 		avisoModal,
 		confirmacaoModal,
 		monitorAudioRef,
+		vinhetaPreviewAudioRef,
 		micAnalyserRef,
 		micDataArrayRef,
 		setAvisoModal,
 		setConfirmacaoModal,
 		handleChangeFaderMic,
 		handleChangeFaderMusica,
+		handleChangeFaderVinheta,
 		alternarMicrofone,
 		alternarEscutaProgramacao,
+		alternarEscutaVinhetaCanal,
+		ouvirVinhetaNoCanal,
+		pararEscutaVinheta,
+		liberarVinhetaNoAr,
 		monitorarMusicaNoAr,
 		transicaoSuaveProxima,
 		carregarPedidos,
 		carregarAcervo,
+		carregarVinhetas,
 		atualizarAcervo,
 		atenderPedido,
 		solicitarDescartePedido,

@@ -60,8 +60,9 @@
 .secaoCanais {
 	position: relative;
 	display: flex;
-	justify-content: space-around;
-	align-items: flex-end;
+	justify-content: space-between;
+	align-items: stretch;
+	gap: 8px;
 	background: radial-gradient(circle at 50% 20%, #1e2638 0%, #0d121c 100%);
 	border: 1px solid #2d3b55;
 	border-top: 1px solid #475a80;
@@ -77,8 +78,9 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	width: 47%;
-	padding: 8px 6px;
+	flex: 1;
+	min-width: 0;
+	padding: 8px 5px;
 	background: linear-gradient(180deg, #131924 0%, #0b0f17 100%);
 	border: 1px solid #1a2334;
 	border-radius: 10px;
@@ -88,12 +90,13 @@
 }
 
 .nomeCanal {
-	font-size: 10px;
+	font-size: 9.5px;
 	font-weight: 800;
 	color: #94a3b8;
 	text-transform: uppercase;
-	letter-spacing: 1px;
+	letter-spacing: 0.7px;
 	text-shadow: 0 1px 2px #000;
+	white-space: nowrap;
 }
 
 .valorFader {
@@ -118,7 +121,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 10px;
+	gap: 8px;
 	width: 100%;
 }
 
@@ -141,7 +144,7 @@
 .faderSlot {
 	position: relative;
 	height: 125px;
-	width: 45px;
+	width: 42px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -189,9 +192,10 @@
 
 .btnCanalMic {
 	margin-top: 5px;
-	width: 110px;
+	width: 100%;
+	max-width: 118px;
 	padding: 6px 4px;
-	font-size: 11px;
+	font-size: 10.5px;
 	font-weight: 800;
 	border-radius: 6px;
 	border: 1px solid #334155;
@@ -200,12 +204,54 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 5px;
 	cursor: pointer;
 	box-shadow:
 		0 3px 6px rgba(0, 0, 0, 0.6),
 		inset 0 1px 0 rgba(255, 255, 255, 0.15);
 	transition: all 0.15s ease;
+	white-space: nowrap;
+}
+
+.botoesCanalVinheta {
+	margin-top: 5px;
+	width: 100%;
+	max-width: 118px;
+	display: flex;
+	gap: 4px;
+}
+
+.btnCanalVinhetaCue,
+.btnCanalVinhetaAr {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 2px;
+	font-size: 9.5px;
+	font-weight: 800;
+	border-radius: 6px;
+	border: 1px solid #334155;
+	background: linear-gradient(180deg, #2b3648 0%, #151c27 100%);
+	color: #cbd5e1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 3px;
+	cursor: pointer;
+	box-shadow:
+		0 3px 6px rgba(0, 0, 0, 0.6),
+		inset 0 1px 0 rgba(255, 255, 255, 0.15);
+	transition: all 0.15s ease;
+	white-space: nowrap;
+}
+
+.btnCanalVinhetaAr {
+	border-color: rgba(168, 85, 247, 0.55);
+	background: linear-gradient(180deg, #581c87 0%, #3b0764 100%);
+	color: #f3e8ff;
+}
+
+.btnCanalVinhetaAr:hover {
+	filter: brightness(1.15);
 }
 
 .ativo {
@@ -228,8 +274,9 @@
 
 .infoCanalMusica {
 	margin-top: 6px;
-	width: 110px;
-	padding: 4px 4px;
+	width: 100%;
+	max-width: 118px;
+	padding: 4px 5px;
 	font-size: 9px;
 	font-weight: 800;
 	text-align: center;
@@ -237,8 +284,11 @@
 	background: #06090e;
 	border: 1px solid #1c2536;
 	border-radius: 6px;
-	letter-spacing: 0.8px;
+	letter-spacing: 0.6px;
 	box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .cardMusicaNoAr {
@@ -256,11 +306,11 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	font-size: 9px;
+	font-size: 10px;
 	font-weight: 800;
 	text-transform: uppercase;
 	letter-spacing: 0.6px;
-	color: #38bdf8;
+	color: #f54b4b;
 }
 
 .statusTopoRight {
@@ -487,6 +537,75 @@
 	font-size: 10px;
 	font-weight: 700;
 	cursor: pointer;
+}
+
+.painelVinhetas {
+	background: #111722;
+	border: 1px solid rgba(168, 85, 247, 0.35);
+	border-radius: 12px;
+	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.cardVinhetaCatBtn {
+	background: #19162b;
+	border: 1px solid rgba(168, 85, 247, 0.35);
+	border-radius: 8px;
+	padding: 8px 10px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.cardVinhetaCatBtn:hover {
+	background: #251d3d;
+	border-color: #a855f7;
+}
+
+.vinhetaBadgeCount {
+	background: #130d24;
+	border: 1px solid rgba(168, 85, 247, 0.45);
+	font-size: 9px;
+	font-weight: 700;
+	color: #c084fc;
+	padding: 2px 6px;
+	border-radius: 10px;
+	white-space: nowrap;
+}
+
+.btnVinhetaOuvir {
+	background: rgba(16, 185, 129, 0.16);
+	border: 1px solid #10b981;
+	color: #6ee7b7;
+	border-radius: 6px;
+	padding: 4px 8px;
+	font-size: 10px;
+	font-weight: 700;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: all 0.15s ease;
+}
+
+.btnVinhetaOuvir:hover {
+	background: #059669;
+	color: #fff;
+}
+
+.btnVinhetaOuvirAtivo {
+	background: #10b981;
+	border-color: #34d399;
+	color: #052e16;
+	box-shadow: 0 0 10px rgba(16, 185, 129, 0.55);
+}
+
+.btnVinhetaNoArAtivo {
+	background: linear-gradient(135deg, #22c55e, #15803d);
+	border-color: #86efac;
+	box-shadow: 0 0 12px rgba(34, 197, 94, 0.65);
 }
 
 .painelAcervo {

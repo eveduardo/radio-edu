@@ -667,6 +667,9 @@ export const useRadioPlayer = () => {
 				if (dados.atualizacao_programacao) {
 					ultimaAtualizacaoProgRef.current = dados.atualizacao_programacao;
 				}
+				if (dados.vinheta_ativa?.timestamp) {
+					ultimaVinhetaTocadaRef.current = dados.vinheta_ativa.timestamp;
+				}
 				if (!chunkRecenteAoVivo) {
 					return;
 				}
@@ -700,11 +703,46 @@ export const useRadioPlayer = () => {
 			) {
 				ultimaVinhetaTocadaRef.current = dados.vinheta_ativa.timestamp;
 				const playerVinheta = playerVinhetaRef.current;
-				if (playerVinheta) {
-					playerVinheta.src = resolveRadioAssetUrl(dados.vinheta_ativa.arquivo);
-					playerVinheta.volume = volumeMasterRef.current;
-					if (estaTocandoRef.current) {
-						playerVinheta.play().catch(() => {});
+
+				if (dados.vinheta_ativa.acao === "parar") {
+					playerVinheta?.pause();
+				} else {
+					const caminhoVinheta =
+						dados.vinheta_ativa.url || dados.vinheta_ativa.arquivo || "";
+					const urlVinheta = resolveRadioAssetUrl(caminhoVinheta);
+					if (playerVinheta && urlVinheta && estaTocandoRef.current) {
+						playerVinheta.src = urlVinheta;
+						try {
+							playerVinheta.volume = Math.max(
+								0,
+								Math.min(1, volumeMasterRef.current),
+							);
+						} catch {
+							// ignore
+						}
+						playerVinheta.play().catch(async () => {
+							// Fallback via Web Audio API caso o elemento <audio> secundário seja bloqueado no celular
+							const ctx = audioCtxRef.current;
+							if (ctx && ctx.state === "running" && analyserRef.current) {
+								try {
+									const resp = await fetch(urlVinheta);
+									const buf = await resp.arrayBuffer();
+									const audioBuf = await ctx.decodeAudioData(buf);
+									const src = ctx.createBufferSource();
+									const gain = ctx.createGain();
+									gain.gain.value = Math.max(
+										0,
+										Math.min(1, volumeMasterRef.current),
+									);
+									src.buffer = audioBuf;
+									src.connect(gain);
+									gain.connect(analyserRef.current);
+									src.start(0);
+								} catch {
+									// ignore
+								}
+							}
+						});
 					}
 				}
 			}

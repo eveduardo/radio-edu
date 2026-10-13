@@ -10,29 +10,41 @@ const LocutorPage = () => {
 		aoVivo,
 		faderMic,
 		faderMusica,
+		faderVinheta,
 		ouvindoProgramacao,
+		ouvindoVinheta,
 		musicaAtual,
 		proximaAtual,
 		tempoRestanteFormatado,
 		transicaoEmAndamento,
 		pedidos,
 		mapaGeneros,
+		mapaVinhetas,
+		vinhetaSelecionada,
+		vinhetaNoArId,
 		atualizandoAcervo,
 		avisoModal,
 		confirmacaoModal,
 		monitorAudioRef,
+		vinhetaPreviewAudioRef,
 		micAnalyserRef,
 		micDataArrayRef,
 		setAvisoModal,
 		setConfirmacaoModal,
 		handleChangeFaderMic,
 		handleChangeFaderMusica,
+		handleChangeFaderVinheta,
 		alternarMicrofone,
 		alternarEscutaProgramacao,
+		alternarEscutaVinhetaCanal,
+		ouvirVinhetaNoCanal,
+		pararEscutaVinheta,
+		liberarVinhetaNoAr,
 		monitorarMusicaNoAr,
 		transicaoSuaveProxima,
 		carregarPedidos,
 		carregarAcervo,
+		carregarVinhetas,
 		atualizarAcervo,
 		atenderPedido,
 		solicitarDescartePedido,
@@ -41,6 +53,8 @@ const LocutorPage = () => {
 
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
 	const [buscaMusicaModal, setBuscaMusicaModal] = useState("");
+	const [vinhetaCategoriaAtiva, setVinhetaCategoriaAtiva] = useState(null);
+	const [buscaVinhetaModal, setBuscaVinhetaModal] = useState("");
 	const [pedidoLeituraAtivo, setPedidoLeituraAtivo] = useState(null);
 
 	const faixasDoGeneroFiltradas = useMemo(() => {
@@ -50,6 +64,14 @@ const LocutorPage = () => {
 		if (!termo) return lista;
 		return lista.filter((f) => (f.nome || "").toLowerCase().includes(termo));
 	}, [buscaMusicaModal, generoModalAtivo, mapaGeneros]);
+
+	const vinhetasDaCategoriaFiltradas = useMemo(() => {
+		if (!vinhetaCategoriaAtiva) return [];
+		const lista = mapaVinhetas[vinhetaCategoriaAtiva] || [];
+		const termo = buscaVinhetaModal.toLowerCase().trim();
+		if (!termo) return lista;
+		return lista.filter((v) => (v.nome || "").toLowerCase().includes(termo));
+	}, [buscaVinhetaModal, mapaVinhetas, vinhetaCategoriaAtiva]);
 
 	return (
 		<div className={styles.locutorScreen}>
@@ -158,6 +180,78 @@ const LocutorPage = () => {
 							<span>{ouvindoProgramacao ? "LIG." : "DESL."}</span>
 						</button>
 					</div>
+
+					{/* CH 3: VINHETA / PRÉ-ESCUTA DO LOCUTOR */}
+					<div className={styles.canalFader}>
+						<div className={styles.nomeCanal}>CH 3 • VINHETA</div>
+						<div className={styles.valorFader}>
+							{Math.round(faderVinheta * 100)}%
+						</div>
+
+						<div className={styles.faderComVuRow}>
+							<VerticalVuMeter
+								mode="vinheta"
+								aoVivo={ouvindoVinheta}
+								faderValue={faderVinheta}
+							/>
+							<div className={styles.faderSlot}>
+								<input
+									type="range"
+									className={styles.faderVertical}
+									min="0"
+									max="1"
+									step="0.01"
+									value={faderVinheta}
+									onChange={(e) => handleChangeFaderVinheta(e.target.value)}
+									aria-label="Volume de Pré-escuta de Vinhetas (CH-3)"
+								/>
+							</div>
+						</div>
+
+						<div
+							className={styles.infoCanalMusica}
+							title={
+								vinhetaSelecionada
+									? `Selecionada: ${vinhetaSelecionada.nome}`
+									: "Pré-escuta exclusiva do locutor"
+							}
+						>
+							{vinhetaSelecionada ? vinhetaSelecionada.nome : "PRÉ-ESCUTA"}
+						</div>
+						<div className={styles.botoesCanalVinheta}>
+							<button
+								type="button"
+								className={clsx(
+									styles.btnCanalVinhetaCue,
+									ouvindoVinheta && styles.ativoRetorno,
+								)}
+								onClick={alternarEscutaVinhetaCanal}
+								title="Ouvir / Parar vinheta apenas para o locutor (CH-3)"
+							>
+								<span>{ouvindoVinheta ? "⏹" : "🎧"}</span>
+								<span>{ouvindoVinheta ? "PARAR" : "OUVIR"}</span>
+							</button>
+							<button
+								type="button"
+								className={clsx(
+									styles.btnCanalVinhetaAr,
+									vinhetaSelecionada &&
+										vinhetaNoArId === vinhetaSelecionada.id &&
+										styles.ativo,
+								)}
+								onClick={() => liberarVinhetaNoAr()}
+								title="Liberar vinheta selecionada para o AR"
+							>
+								<span>📡</span>
+								<span>
+									{vinhetaSelecionada &&
+									vinhetaNoArId === vinhetaSelecionada.id
+										? "NO AR!"
+										: "AR"}
+								</span>
+							</button>
+						</div>
+					</div>
 				</div>
 
 				{/* CARD DE STATUS DA MÚSICA */}
@@ -175,7 +269,7 @@ const LocutorPage = () => {
 								disabled={transicaoEmAndamento}
 								title="Abaixa o volume e chama a próxima faixa"
 							>
-								{transicaoEmAndamento ? "⏳ Virando..." : "⏭ Pular / Fade"}
+								{transicaoEmAndamento ? "⏳ Virando..." : "⏭ Próxima"}
 							</button>
 						</div>
 					</div>
@@ -280,6 +374,52 @@ const LocutorPage = () => {
 											</button>
 										</div>
 									</div>
+								);
+							})
+						)}
+					</div>
+				</div>
+
+				{/* PAINEL DE VINHETAS, JINGOS E PREFIXOS POR SUBPASTA */}
+				<div className={styles.painelVinhetas}>
+					<div className={styles.painelHeader}>
+						<span>📢 Vinhetas, Jingos e Prefixos</span>
+						<div className={styles.acervoHeaderActions}>
+							<button
+								type="button"
+								className={styles.btnRefresh}
+								style={{ color: "#a855f7" }}
+								onClick={carregarVinhetas}
+							>
+								↻ Recarregar
+							</button>
+						</div>
+					</div>
+
+					<div className={styles.gridGeneros}>
+						{Object.keys(mapaVinhetas).length === 0 ? (
+							<div className={styles.emptyGenerosText}>
+								Nenhuma subpasta de vinhetas encontrada em /vinhetas/.
+							</div>
+						) : (
+							Object.entries(mapaVinhetas).map(([nomeCat, listaVinhetas]) => {
+								if (!Array.isArray(listaVinhetas) || listaVinhetas.length === 0)
+									return null;
+								return (
+									<button
+										key={nomeCat}
+										type="button"
+										className={styles.cardVinhetaCatBtn}
+										onClick={() => {
+											setVinhetaCategoriaAtiva(nomeCat);
+											setBuscaVinhetaModal("");
+										}}
+									>
+										<div className={styles.generoNome}>📢 {nomeCat}</div>
+										<span className={styles.vinhetaBadgeCount}>
+											{listaVinhetas.length}
+										</span>
+									</button>
 								);
 							})
 						)}
@@ -440,6 +580,74 @@ const LocutorPage = () => {
 				)}
 			</Modal>
 
+			{/* MODAL DE VINHETAS / JINGOS / PREFIXO POR SUBPASTA */}
+			<Modal
+				isOpen={Boolean(vinhetaCategoriaAtiva)}
+				onClose={() => setVinhetaCategoriaAtiva(null)}
+				title={
+					vinhetaCategoriaAtiva
+						? `📢 ${vinhetaCategoriaAtiva} (${(mapaVinhetas[vinhetaCategoriaAtiva] || []).length})`
+						: "📢 Vinhetas"
+				}
+				size="md"
+				closeLabel="Fechar lista de vinhetas"
+			>
+				<div className={styles.modalGeneroBody}>
+					<Input
+						placeholder="🔍 Filtrar vinheta, jingo ou prefixo..."
+						value={buscaVinhetaModal}
+						onValueChange={setBuscaVinhetaModal}
+					/>
+					<div className={styles.listaMusicasGenero}>
+						{vinhetasDaCategoriaFiltradas.length === 0 ? (
+							<div className={styles.emptyPanelText}>
+								Nenhuma vinheta encontrada.
+							</div>
+						) : (
+							vinhetasDaCategoriaFiltradas.map((v) => {
+								const estaOuvindoEsta =
+									ouvindoVinheta && vinhetaSelecionada?.id === v.id;
+								const estaNoArEsta = vinhetaNoArId === v.id;
+								return (
+									<div
+										key={v.id || v.arquivo || v.nome}
+										className={styles.itemMusicaLinha}
+									>
+										<span className={styles.itemMusicaTitulo}>
+											📢 {v.nome}
+										</span>
+										<div className={styles.botoesAcaoPedido}>
+											<button
+												type="button"
+												className={clsx(
+													styles.btnVinhetaOuvir,
+													estaOuvindoEsta && styles.btnVinhetaOuvirAtivo,
+												)}
+												onClick={() => ouvirVinhetaNoCanal(v)}
+												title="Pré-escutar apenas para o locutor (CH-3)"
+											>
+												{estaOuvindoEsta ? "⏹ Parar (CH-3)" : "🎧 Ouvir (CH-3)"}
+											</button>
+											<button
+												type="button"
+												className={clsx(
+													styles.btnAcervoTocarAgora,
+													estaNoArEsta && styles.btnVinhetaNoArAtivo,
+												)}
+												onClick={() => liberarVinhetaNoAr(v)}
+												title="Liberar esta vinheta imediatamente para o AR"
+											>
+												{estaNoArEsta ? "📡 No Ar!" : "📡 Pro Ar"}
+											</button>
+										</div>
+									</div>
+								);
+							})
+						)}
+					</div>
+				</div>
+			</Modal>
+
 			{/* MODAL DE SELEÇÃO DE MÚSICA POR GÊNERO */}
 			<Modal
 				isOpen={Boolean(generoModalAtivo)}
@@ -562,6 +770,13 @@ const LocutorPage = () => {
 				preload="auto"
 				crossOrigin="anonymous"
 				onEnded={monitorarMusicaNoAr}
+			/>
+			<audio
+				ref={vinhetaPreviewAudioRef}
+				preload="auto"
+				crossOrigin="anonymous"
+				onEnded={pararEscutaVinheta}
+				onError={pararEscutaVinheta}
 			/>
 		</div>
 	);
