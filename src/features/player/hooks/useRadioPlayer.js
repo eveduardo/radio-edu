@@ -344,11 +344,11 @@ export const useRadioPlayer = () => {
 						}
 
 						const iniciarPlay = () => {
+							player.muted = false;
+							aplicarVolumesMesa();
 							player
 								.play()
 								.then(() => {
-									player.muted = false;
-									aplicarVolumesMesa();
 									setStatusTexto("Transmitindo em tempo real");
 								})
 								.catch((err) => {
@@ -361,6 +361,8 @@ export const useRadioPlayer = () => {
 													estadoMesaRef.current?.musica_tocando !== false &&
 													player.paused
 												) {
+													player.muted = false;
+													aplicarVolumesMesa();
 													player.play().catch(() => {});
 												}
 											},
@@ -368,8 +370,9 @@ export const useRadioPlayer = () => {
 										);
 										return;
 									}
-									// Se o navegador bloqueou autoplay com som na primeira abertura,
-									// inicia a reprodução sincronizada imediatamente e libera o som no primeiro movimento/evento
+									// Se o navegador bloqueou autoplay com som na primeira abertura sem gesto,
+									// inicia a reprodução tocando com muted para manter a rádio sincronizada
+									// e desbloqueia o som ao menor toque/interação
 									player.muted = true;
 									player
 										.play()
@@ -492,6 +495,20 @@ export const useRadioPlayer = () => {
 		inicializarAudioContext();
 		const player = playerRef.current;
 
+		// Se o áudio estava mudo devido ao bloqueio de autoplay do navegador na abertura,
+		// o primeiro toque deve liberar o som imediatamente, e não pausar
+		if (player && player.muted) {
+			player.muted = false;
+			aplicarVolumesMesa();
+			estaTocandoRef.current = true;
+			setEstaTocando(true);
+			setStatusTexto("Transmitindo em tempo real");
+			if (player.paused) {
+				player.play().catch(() => {});
+			}
+			return;
+		}
+
 		if (!estaTocandoRef.current) {
 			estaTocandoRef.current = true;
 			setEstaTocando(true);
@@ -554,19 +571,10 @@ export const useRadioPlayer = () => {
 		return () => clearInterval(interval);
 	}, [sincronizarRadio]);
 
-	// Desbloqueio imediato de áudio em qualquer interação/movimento
+	// Desbloqueio imediato de áudio em qualquer interação, toque ou movimento na tela
 	useEffect(() => {
-		const desbloquear = (e) => {
-			const isUserActivation =
-				e.type === "click" ||
-				e.type === "touchstart" ||
-				e.type === "pointerdown" ||
-				e.type === "mousedown" ||
-				e.type === "keydown";
-
-			if (isUserActivation) {
-				inicializarAudioContext();
-			}
+		const desbloquear = () => {
+			inicializarAudioContext();
 
 			const player = playerRef.current;
 			if (
@@ -581,52 +589,45 @@ export const useRadioPlayer = () => {
 			if (player.muted) {
 				player.muted = false;
 				aplicarVolumesMesa();
-				if (player.paused) {
-					player
-						.play()
-						.then(() => {
-							setStatusTexto("Transmitindo em tempo real");
-						})
-						.catch(() => {
-							player.muted = true;
-							player.play().catch(() => {});
-						});
-					return;
-				}
 			}
 
 			if (player.paused) {
 				player
 					.play()
 					.then(() => {
+						player.muted = false;
+						aplicarVolumesMesa();
 						setStatusTexto("Transmitindo em tempo real");
 					})
-					.catch(() => {
-						if (!isUserActivation) {
-							player.muted = true;
-							player.play().catch(() => {});
-						}
-					});
+					.catch(() => {});
 			}
 		};
 
 		const eventos = [
 			"click",
 			"touchstart",
+			"touchend",
 			"pointerdown",
 			"mousedown",
 			"keydown",
 			"pointermove",
 			"mousemove",
 			"wheel",
+			"scroll",
+			"focus",
 		];
 
 		eventos.forEach((evt) =>
-			document.addEventListener(evt, desbloquear, { passive: true }),
+			window.addEventListener(evt, desbloquear, {
+				passive: true,
+				capture: true,
+			}),
 		);
 
 		return () => {
-			eventos.forEach((evt) => document.removeEventListener(evt, desbloquear));
+			eventos.forEach((evt) =>
+				window.removeEventListener(evt, desbloquear, { capture: true }),
+			);
 		};
 	}, [aplicarVolumesMesa, inicializarAudioContext]);
 

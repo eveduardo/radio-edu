@@ -58,10 +58,18 @@ export const HorizontalVuMeter = ({
 				audioCtx.state === "running" &&
 				estaTocando &&
 				player &&
-				!player.paused
+				!player.paused &&
+				dataArray
 			) {
 				analyser.getByteFrequencyData(dataArray);
-				dadosPresentes = true;
+				let soma = 0;
+				for (let i = 0; i < dataArray.length; i++) {
+					soma += dataArray[i];
+					if (soma > 15) break;
+				}
+				if (soma > 15) {
+					dadosPresentes = true;
+				}
 			}
 
 			for (let b = 0; b < numBarras; b++) {
@@ -71,9 +79,10 @@ export const HorizontalVuMeter = ({
 					const idx = Math.min(Math.floor(b * 1.6), dataArray.length - 1);
 					intensidade = dataArray[idx] / 255;
 				} else if (estaTocando && player && !player.paused) {
-					const onda = Math.sin(animTick + b * 0.75) * 0.5 + 0.5;
-					const ruido = Math.random() * 0.25;
-					intensidade = Math.min(1, onda * 0.75 + ruido);
+					// Animação realista e orgânica de VU meter de rádio
+					const onda = Math.sin(animTick * 1.4 + b * 0.75) * 0.35 + 0.45;
+					const ruido = (Math.sin(animTick * 3.7 + b * 2.1) + 1) * 0.15;
+					intensidade = Math.min(1, Math.max(0.1, onda + ruido));
 				}
 
 				const ledsAcesos = Math.round(intensidade * ledsPorBarra);
