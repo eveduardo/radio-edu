@@ -751,6 +751,7 @@ export const useRadioPlayer = () => {
 
 				if (dados.vinheta_ativa.acao === "parar") {
 					playerVinheta?.pause();
+					aplicarVolumesMesa();
 				} else {
 					const caminhoVinheta =
 						dados.vinheta_ativa.url || dados.vinheta_ativa.arquivo || "";
@@ -765,6 +766,33 @@ export const useRadioPlayer = () => {
 						} catch {
 							// ignore
 						}
+
+						const duckMusicaOuvinte = () => {
+							const ctx = audioCtxRef.current;
+							const gainNode = gainNodeMusicaRef.current;
+							const player = playerRef.current;
+							const volBase = Math.max(0, Math.min(1, volumeMasterRef.current));
+
+							if (gainNode && ctx && ctx.state === "running") {
+								gainNode.gain.setValueAtTime(0.2 * volBase, ctx.currentTime);
+							} else if (player) {
+								try {
+									player.volume = 0.2 * volBase;
+								} catch {
+									// ignore
+								}
+							}
+						};
+
+						const restaurarMusicaOuvinte = () => {
+							aplicarVolumesMesa();
+						};
+
+						playerVinheta.onended = restaurarMusicaOuvinte;
+						playerVinheta.onerror = restaurarMusicaOuvinte;
+
+						duckMusicaOuvinte();
+
 						playerVinheta.play().catch(async () => {
 							// Fallback via Web Audio API caso o elemento <audio> secundário seja bloqueado no celular
 							const ctx = audioCtxRef.current;
@@ -782,10 +810,13 @@ export const useRadioPlayer = () => {
 									src.buffer = audioBuf;
 									src.connect(gain);
 									gain.connect(analyserRef.current);
+									src.onended = restaurarMusicaOuvinte;
 									src.start(0);
 								} catch {
-									// ignore
+									restaurarMusicaOuvinte();
 								}
+							} else {
+								restaurarMusicaOuvinte();
 							}
 						});
 					}

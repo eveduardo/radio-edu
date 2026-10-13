@@ -113,6 +113,7 @@ export const useLocutorMesa = () => {
 	faderMicRef.current = faderMic;
 	const faderMusicaRef = useRef(faderMusica);
 	faderMusicaRef.current = faderMusica;
+	const faderMusicaAnteriorRef = useRef(null);
 	const faderVinhetaRef = useRef(faderVinheta);
 	faderVinhetaRef.current = faderVinheta;
 	const musicaPausadaRef = useRef(musicaPausada);
@@ -631,7 +632,8 @@ export const useLocutorMesa = () => {
 		musicaPausadaRef.current = false;
 		setMusicaPausada(false);
 
-		const volInicial = faderMusicaRef.current;
+		const volInicial = faderMusicaAnteriorRef.current ?? faderMusicaRef.current;
+		faderMusicaAnteriorRef.current = null;
 
 		try {
 			// Se não houve agendamento manual nem pedido pendente, fixa a faixa exibida em "A seguir"
@@ -809,6 +811,46 @@ export const useLocutorMesa = () => {
 		}
 	}, [ouvirVinhetaNoCanal, pararEscutaVinheta]);
 
+	const duckarVolumeMusica = useCallback(async () => {
+		const volAtual = faderMusicaRef.current;
+		if (volAtual <= 0.2) return;
+		if (faderMusicaAnteriorRef.current === null) {
+			faderMusicaAnteriorRef.current = volAtual;
+		}
+
+		const volAlvo = 0.2;
+		const passos = 4;
+		const diff = (volAtual - volAlvo) / passos;
+
+		for (let i = 1; i <= passos; i++) {
+			await new Promise((r) => setTimeout(r, 25));
+			const v = Number(Math.max(volAlvo, volAtual - diff * i).toFixed(2));
+			faderMusicaRef.current = v;
+			setFaderMusica(v);
+			aplicarVolumeMonitor(v);
+		}
+		sincronizarMesaFirebase(true);
+	}, [aplicarVolumeMonitor, sincronizarMesaFirebase]);
+
+	const restaurarVolumeMusica = useCallback(async () => {
+		if (faderMusicaAnteriorRef.current === null) return;
+		const volAlvo = faderMusicaAnteriorRef.current;
+		faderMusicaAnteriorRef.current = null;
+		const volAtual = faderMusicaRef.current;
+
+		const passos = 5;
+		const diff = (volAlvo - volAtual) / passos;
+
+		for (let i = 1; i <= passos; i++) {
+			await new Promise((r) => setTimeout(r, 40));
+			const v = Number(Math.min(volAlvo, volAtual + diff * i).toFixed(2));
+			faderMusicaRef.current = v;
+			setFaderMusica(v);
+			aplicarVolumeMonitor(v);
+		}
+		sincronizarMesaFirebase(true);
+	}, [aplicarVolumeMonitor, sincronizarMesaFirebase]);
+
 	const iniciarCronometroVinhetaNoAr = useCallback((alvo, urlVinheta) => {
 		if (vinhetaTimerIntervalRef.current) {
 			clearInterval(vinhetaTimerIntervalRef.current);
@@ -874,9 +916,10 @@ export const useLocutorMesa = () => {
 				setTempoRestanteVinhetaSeg(0);
 				vinhetaSelecionadaRef.current = null;
 				setVinhetaSelecionada(null);
+				restaurarVolumeMusica();
 			}
 		}, 250);
-	}, []);
+	}, [restaurarVolumeMusica]);
 
 	useEffect(() => {
 		return () => {
@@ -930,6 +973,9 @@ export const useLocutorMesa = () => {
 					},
 				});
 
+				// Baixa o volume da música suavemente durante a vinheta
+				duckarVolumeMusica();
+
 				iniciarCronometroVinhetaNoAr(alvo, urlVinheta);
 			} catch {
 				setAvisoModal({
@@ -939,7 +985,7 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[iniciarCronometroVinhetaNoAr],
+		[duckarVolumeMusica, iniciarCronometroVinhetaNoAr],
 	);
 
 	const atualizarAcervo = useCallback(async () => {
