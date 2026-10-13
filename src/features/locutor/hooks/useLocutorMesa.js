@@ -9,6 +9,7 @@ import {
 	removeListenerRequest,
 	resolveRadioAssetUrl,
 	scheduleNextTrack,
+	setRadioMusicPaused,
 	updateMesa,
 	uploadVoiceChunk,
 } from "@/services";
@@ -85,6 +86,7 @@ export const useLocutorMesa = () => {
 	const [faderMic, setFaderMic] = useState(1);
 	const [faderMusica, setFaderMusica] = useState(1);
 	const [faderVinheta, setFaderVinheta] = useState(1);
+	const [musicaPausada, setMusicaPausada] = useState(false);
 	const [ouvindoProgramacao, setOuvindoProgramacao] = useState(false);
 	const [ouvindoVinheta, setOuvindoVinheta] = useState(false);
 
@@ -113,6 +115,8 @@ export const useLocutorMesa = () => {
 	faderMusicaRef.current = faderMusica;
 	const faderVinhetaRef = useRef(faderVinheta);
 	faderVinhetaRef.current = faderVinheta;
+	const musicaPausadaRef = useRef(musicaPausada);
+	musicaPausadaRef.current = musicaPausada;
 	const ouvindoProgramacaoRef = useRef(ouvindoProgramacao);
 	ouvindoProgramacaoRef.current = ouvindoProgramacao;
 	const ouvindoVinhetaRef = useRef(ouvindoVinheta);
@@ -174,7 +178,7 @@ export const useLocutorMesa = () => {
 			updateMesa({
 				ao_vivo: aoVivoRef.current,
 				mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
-				musica_tocando: true,
+				musica_tocando: !musicaPausadaRef.current,
 				musica_volume: Math.max(0, Math.min(1, faderMusicaRef.current)),
 			}).catch(() => {});
 		};
@@ -471,6 +475,11 @@ export const useLocutorMesa = () => {
 					Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
 				);
 
+				if (typeof data.pausado === "boolean") {
+					musicaPausadaRef.current = data.pausado;
+					setMusicaPausada(data.pausado);
+				}
+
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual.url || "");
 				const audio = monitorAudioRef.current;
 
@@ -499,7 +508,13 @@ export const useLocutorMesa = () => {
 									once: true,
 								});
 							}
-							audio.play().catch(() => {});
+							if (!musicaPausadaRef.current) {
+								audio.play().catch(() => {});
+							} else {
+								audio.pause();
+							}
+						} else if (musicaPausadaRef.current) {
+							audio.pause();
 						} else if (
 							audio.readyState >= 2 &&
 							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 4
@@ -517,6 +532,40 @@ export const useLocutorMesa = () => {
 		[aplicarVolumeMonitor],
 	);
 
+	const alternarPausaMusicaNoAr = useCallback(async () => {
+		const novoPausado = !musicaPausadaRef.current;
+		musicaPausadaRef.current = novoPausado;
+		setMusicaPausada(novoPausado);
+
+		const audio = monitorAudioRef.current;
+		if (audio) {
+			if (novoPausado) {
+				audio.pause();
+			} else if (ouvindoProgramacaoRef.current && audio.src) {
+				aplicarVolumeMonitor(faderMusicaRef.current);
+				audio.play().catch(() => {});
+			}
+		}
+
+		// Notifica imediatamente os ouvintes via Firebase
+		updateMesa({ musica_tocando: !novoPausado }).catch(() => {});
+
+		try {
+			const res = await setRadioMusicPaused(novoPausado);
+			if (res && typeof res.offset_segundos === "number") {
+				offsetAtualRef.current = res.offset_segundos;
+				if (res.duracao) {
+					duracaoAtualRef.current = res.duracao;
+				}
+				setTempoRestanteSeg(
+					Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
+				);
+			}
+		} catch {
+			// ignore
+		}
+	}, [aplicarVolumeMonitor]);
+
 	const alternarEscutaProgramacao = useCallback(async () => {
 		const audio = monitorAudioRef.current;
 		if (!ouvindoProgramacaoRef.current) {
@@ -528,7 +577,7 @@ export const useLocutorMesa = () => {
 				const data = await fetchRadioSync();
 				aplicarDadosSyncNaMesa(data);
 			} catch {
-				if (audio && urlFaixaNoArRef.current) {
+				if (audio && urlFaixaNoArRef.current && !musicaPausadaRef.current) {
 					audio.src = urlFaixaNoArRef.current;
 					audio.play().catch(() => {});
 				}
@@ -554,6 +603,8 @@ export const useLocutorMesa = () => {
 		const syncInterval = setInterval(monitorarMusicaNoAr, 15000);
 
 		const countdownInterval = setInterval(() => {
+			if (musicaPausadaRef.current) return;
+
 			offsetAtualRef.current += 1;
 			const restante = Math.max(
 				0,
@@ -576,6 +627,9 @@ export const useLocutorMesa = () => {
 		if (transicaoEmAndamentoRef.current) return;
 		transicaoEmAndamentoRef.current = true;
 		setTransicaoEmAndamento(true);
+
+		musicaPausadaRef.current = false;
+		setMusicaPausada(false);
 
 		const volInicial = faderMusicaRef.current;
 
@@ -606,7 +660,10 @@ export const useLocutorMesa = () => {
 		}
 
 		// 2. Notifica todos os ouvintes via Firebase para fazerem o crossfade para a nova faixa do servidor
-		await updateMesa({ forcar_troca: Date.now() }).catch(() => {});
+		await updateMesa({
+			musica_tocando: true,
+			forcar_troca: Date.now(),
+		}).catch(() => {});
 
 		// 3. Anima o fader na interface do locutor
 		const passos = 6;
@@ -1032,6 +1089,7 @@ export const useLocutorMesa = () => {
 		faderMic,
 		faderMusica,
 		faderVinheta,
+		musicaPausada,
 		ouvindoProgramacao,
 		ouvindoVinheta,
 		musicaAtual,
@@ -1059,6 +1117,7 @@ export const useLocutorMesa = () => {
 		handleChangeFaderMusica,
 		handleChangeFaderVinheta,
 		alternarMicrofone,
+		alternarPausaMusicaNoAr,
 		alternarEscutaProgramacao,
 		alternarEscutaVinhetaCanal,
 		ouvirVinhetaNoCanal,

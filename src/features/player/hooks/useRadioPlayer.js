@@ -334,6 +334,9 @@ export const useRadioPlayer = () => {
 				if (!novaUrl) return data;
 
 				const offsetExato = Math.max(0, data.offset_segundos || 0);
+				const pausadoNaMesa =
+					data.pausado === true ||
+					estadoMesaRef.current?.musica_tocando === false;
 				const player = playerRef.current;
 
 				if (
@@ -366,7 +369,9 @@ export const useRadioPlayer = () => {
 						});
 					}
 
-					if (estaTocandoRef.current) {
+					if (pausadoNaMesa) {
+						player.pause();
+					} else if (estaTocandoRef.current) {
 						if (audioCtxRef.current?.state === "suspended") {
 							audioCtxRef.current.resume().catch(() => {});
 						}
@@ -384,7 +389,11 @@ export const useRadioPlayer = () => {
 										player.addEventListener(
 											"canplay",
 											() => {
-												if (estaTocandoRef.current && player.paused) {
+												if (
+													estaTocandoRef.current &&
+													estadoMesaRef.current?.musica_tocando !== false &&
+													player.paused
+												) {
 													player.play().catch(() => {});
 												}
 											},
@@ -405,6 +414,10 @@ export const useRadioPlayer = () => {
 						};
 
 						iniciarPlay();
+					}
+				} else if (player && pausadoNaMesa) {
+					if (!player.paused) {
+						player.pause();
 					}
 				} else if (
 					player &&
@@ -524,7 +537,10 @@ export const useRadioPlayer = () => {
 			}
 			aplicarVolumesMesa();
 
-			if (player?.src && player.src !== window.location.href) {
+			if (estadoMesaRef.current?.musica_tocando === false) {
+				setStatusTexto("Transmitindo em tempo real");
+				sincronizarRadio(false, { recarregarAudio: true });
+			} else if (player?.src && player.src !== window.location.href) {
 				player
 					.play()
 					.then(() => {
@@ -588,7 +604,14 @@ export const useRadioPlayer = () => {
 			}
 
 			const player = playerRef.current;
-			if (!player || !estaTocandoRef.current || !player.src) return;
+			if (
+				!player ||
+				!estaTocandoRef.current ||
+				!player.src ||
+				estadoMesaRef.current?.musica_tocando === false
+			) {
+				return;
+			}
 
 			if (player.muted) {
 				player.muted = false;
@@ -649,6 +672,28 @@ export const useRadioPlayer = () => {
 
 			if (!emTransicaoSuaveRef.current) {
 				aplicarVolumesMesa();
+			}
+
+			const player = playerRef.current;
+			if (dados.musica_tocando === false) {
+				if (player && !player.paused) {
+					player.pause();
+				}
+			} else if (
+				estaTocandoRef.current &&
+				player &&
+				player.paused &&
+				player.src &&
+				!emTransicaoSuaveRef.current
+			) {
+				player
+					.play()
+					.then(() => {
+						player.muted = false;
+						aplicarVolumesMesa();
+						setStatusTexto("Transmitindo em tempo real");
+					})
+					.catch(() => {});
 			}
 
 			if (primeiraCargaFirebaseRef.current) {

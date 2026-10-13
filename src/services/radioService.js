@@ -18,6 +18,21 @@ export const fetchRadioSync = async ({ forcarProxima = false } = {}) => {
 };
 
 /**
+ * Pausa ou retoma a música que está no ar no servidor (`radio_sync.php?acao_musica=pausar|retomar`).
+ *
+ * @param {boolean} pausar `true` para pausar, `false` para retomar
+ */
+export const setRadioMusicPaused = async (pausar) => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: {
+			acao_musica: pausar ? "pausar" : "retomar",
+			t: Date.now(),
+		},
+	});
+	return data;
+};
+
+/**
  * Lista o acervo indexado agrupado por gênero (`radio_sync.php?listar_generos=1`).
  *
  * @returns {Promise<Record<string, Array<{id: string, arquivo: string, nome: string, genero: string, url: string, duracao: number}>>>}

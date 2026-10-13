@@ -11,6 +11,7 @@ const LocutorPage = () => {
 		faderMic,
 		faderMusica,
 		faderVinheta,
+		musicaPausada,
 		ouvindoProgramacao,
 		ouvindoVinheta,
 		musicaAtual,
@@ -38,6 +39,7 @@ const LocutorPage = () => {
 		handleChangeFaderMusica,
 		handleChangeFaderVinheta,
 		alternarMicrofone,
+		alternarPausaMusicaNoAr,
 		alternarEscutaProgramacao,
 		alternarEscutaVinhetaCanal,
 		ouvirVinhetaNoCanal,
@@ -146,7 +148,11 @@ const LocutorPage = () => {
 						</div>
 
 						<div className={styles.faderComVuRow}>
-							<VerticalVuMeter mode="musica" faderValue={faderMusica} />
+							<VerticalVuMeter
+								mode="musica"
+								aoVivo={!musicaPausada}
+								faderValue={faderMusica}
+							/>
 							<div className={styles.faderSlot}>
 								<input
 									type="range"
@@ -169,19 +175,44 @@ const LocutorPage = () => {
 							</div>
 						</div>
 
-						<div className={styles.infoCanalMusica}>PROGRAMAÇÃO</div>
-						<button
-							type="button"
+						<div
 							className={clsx(
-								styles.btnCanalMic,
-								ouvindoProgramacao && styles.ativoRetorno,
+								styles.infoCanalMusica,
+								musicaPausada && styles.infoCanalMusicaPausada,
 							)}
-							onClick={alternarEscutaProgramacao}
-							title="Ligar / Desligar escuta da música que está no ar"
 						>
-							<span>{ouvindoProgramacao ? "🔊" : "🔇"}</span>
-							<span>{ouvindoProgramacao ? "LIG." : "DESL."}</span>
-						</button>
+							{musicaPausada ? "EM PAUSA" : "PROGRAMAÇÃO"}
+						</div>
+						<div className={styles.botoesCanalVinheta}>
+							<button
+								type="button"
+								className={clsx(
+									styles.btnCanalVinhetaCue,
+									musicaPausada && styles.ativoPausa,
+								)}
+								onClick={alternarPausaMusicaNoAr}
+								title={
+									musicaPausada
+										? "Retomar a música que está no ar"
+										: "Pausar a música que está no ar"
+								}
+							>
+								<span>{musicaPausada ? "▶" : "⏸"}</span>
+								<span>{musicaPausada ? "PLAY" : "PAUSA"}</span>
+							</button>
+							<button
+								type="button"
+								className={clsx(
+									styles.btnCanalVinhetaCue,
+									ouvindoProgramacao && styles.ativoRetorno,
+								)}
+								onClick={alternarEscutaProgramacao}
+								title="Ligar / Desligar escuta da música que está no ar"
+							>
+								<span>{ouvindoProgramacao ? "🔊" : "🔇"}</span>
+								<span>{ouvindoProgramacao ? "LIG." : "DESL."}</span>
+							</button>
+						</div>
 					</div>
 
 					{/* CH 3: VINHETA / PRÉ-ESCUTA DO LOCUTOR */}
@@ -194,7 +225,7 @@ const LocutorPage = () => {
 						<div className={styles.faderComVuRow}>
 							<VerticalVuMeter
 								mode="vinheta"
-								aoVivo={ouvindoVinheta || tempoRestanteVinhetaSeg > 0}
+								aoVivo={ouvindoVinheta}
 								faderValue={faderVinheta}
 							/>
 							<div className={styles.faderSlot}>
@@ -212,23 +243,14 @@ const LocutorPage = () => {
 						</div>
 
 						<div
-							className={clsx(
-								styles.infoCanalMusica,
-								tempoRestanteVinhetaSeg > 0 && styles.infoCanalVinhetaNoAr,
-							)}
+							className={styles.infoCanalMusica}
 							title={
-								tempoRestanteVinhetaSeg > 0
-									? `Vinheta no ar: ${vinhetaNoArNome || vinhetaSelecionada?.nome || ""} (${tempoRestanteVinhetaFormatado} restantes)`
-									: vinhetaSelecionada
-										? `Selecionada: ${vinhetaSelecionada.nome}`
-										: "Pré-escuta exclusiva do locutor"
+								vinhetaSelecionada
+									? `Selecionada: ${vinhetaSelecionada.nome}`
+									: "Pré-escuta exclusiva do locutor"
 							}
 						>
-							{tempoRestanteVinhetaSeg > 0
-								? `⏱ ${tempoRestanteVinhetaFormatado} • ${vinhetaNoArNome || vinhetaSelecionada?.nome || "NO AR"}`
-								: vinhetaSelecionada
-									? vinhetaSelecionada.nome
-									: "PRÉ-ESCUTA"}
+							{vinhetaSelecionada ? vinhetaSelecionada.nome : "PRÉ-ESCUTA"}
 						</div>
 						<div className={styles.botoesCanalVinheta}>
 							<button
@@ -247,15 +269,18 @@ const LocutorPage = () => {
 								type="button"
 								className={clsx(
 									styles.btnCanalVinhetaAr,
-									tempoRestanteVinhetaSeg > 0 && styles.ativo,
+									vinhetaSelecionada &&
+										vinhetaNoArId === vinhetaSelecionada.id &&
+										styles.ativo,
 								)}
 								onClick={() => liberarVinhetaNoAr()}
 								title="Liberar vinheta selecionada para o AR"
 							>
-								<span>{tempoRestanteVinhetaSeg > 0 ? "⏱" : "📡"}</span>
+								<span>📡</span>
 								<span>
-									{tempoRestanteVinhetaSeg > 0
-										? tempoRestanteVinhetaFormatado
+									{vinhetaSelecionada &&
+									vinhetaNoArId === vinhetaSelecionada.id
+										? "NO AR!"
 										: "AR"}
 								</span>
 							</button>
@@ -661,11 +686,7 @@ const LocutorPage = () => {
 												onClick={() => liberarVinhetaNoAr(v)}
 												title="Liberar esta vinheta imediatamente para o AR"
 											>
-												{estaNoArEsta && tempoRestanteVinhetaSeg > 0
-													? `⏱ ${tempoRestanteVinhetaFormatado}`
-													: estaNoArEsta
-														? "📡 No Ar!"
-														: "📡 Pro Ar"}
+												{estaNoArEsta ? "📡 No Ar!" : "📡 Pro Ar"}
 											</button>
 										</div>
 									</div>

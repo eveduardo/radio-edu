@@ -75,7 +75,7 @@ export const VerticalVuMeter = ({
 					const beat = Math.sin(animTick * 4.2) > 0.5 ? 0.25 : 0;
 					nivel = Math.min(faderValue, Math.max(0, (onda + beat) * faderValue));
 				}
-			} else if (faderValue > 0) {
+			} else if (aoVivo && faderValue > 0) {
 				const onda = Math.sin(animTick * 1.2) * 0.35 + 0.55;
 				const beat = Math.sin(animTick * 3.5) > 0.6 ? 0.25 : 0;
 				nivel = Math.min(faderValue, Math.max(0, (onda + beat) * faderValue));

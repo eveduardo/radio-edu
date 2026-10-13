@@ -279,6 +279,15 @@
 		inset 0 1px 1px rgba(255, 255, 255, 0.4);
 }
 
+.ativoPausa {
+	background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
+	border-color: #fbbf24;
+	color: #fff;
+	box-shadow:
+		0 0 14px rgba(245, 158, 11, 0.7),
+		inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
 .infoCanalMusica {
 	margin-top: 6px;
 	width: 100%;
@@ -298,12 +307,12 @@
 	text-overflow: ellipsis;
 }
 
-.infoCanalVinhetaNoAr {
-	color: #f3e8ff;
-	background: #2e1065;
-	border-color: #a855f7;
+.infoCanalMusicaPausada {
+	color: #fef3c7;
+	background: #451a03;
+	border-color: #f59e0b;
 	box-shadow:
-		0 0 10px rgba(168, 85, 247, 0.55),
+		0 0 8px rgba(245, 158, 11, 0.45),
 		inset 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
