@@ -298,6 +298,15 @@
 	text-overflow: ellipsis;
 }
 
+.infoCanalVinhetaNoAr {
+	color: #f3e8ff;
+	background: #2e1065;
+	border-color: #a855f7;
+	box-shadow:
+		0 0 10px rgba(168, 85, 247, 0.55),
+		inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
 .cardMusicaNoAr {
 	flex-shrink: 0;
 	background: linear-gradient(180deg, #101c38 0%, #0d1527 100%);
@@ -335,6 +344,19 @@
 	display: flex;
 	align-items: center;
 	gap: 8px;
+}
+
+.badgeTempoVinheta {
+	background: rgba(88, 28, 135, 0.75);
+	border: 1px solid #a855f7;
+	padding: 2px 7px;
+	border-radius: 4px;
+	color: #f3e8ff;
+	font-family: monospace;
+	font-size: 11px;
+	font-weight: 800;
+	box-shadow: 0 0 8px rgba(168, 85, 247, 0.45);
+	white-space: nowrap;
 }
 
 .badgeTempoRestante {

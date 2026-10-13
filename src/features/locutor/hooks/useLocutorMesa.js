@@ -98,6 +98,8 @@ export const useLocutorMesa = () => {
 	const [mapaVinhetas, setMapaVinhetas] = useState({});
 	const [vinhetaSelecionada, setVinhetaSelecionada] = useState(null);
 	const [vinhetaNoArId, setVinhetaNoArId] = useState(null);
+	const [vinhetaNoArNome, setVinhetaNoArNome] = useState("");
+	const [tempoRestanteVinhetaSeg, setTempoRestanteVinhetaSeg] = useState(0);
 	const [atualizandoAcervo, setAtualizandoAcervo] = useState(false);
 
 	const [avisoModal, setAvisoModal] = useState(null);
@@ -124,6 +126,8 @@ export const useLocutorMesa = () => {
 
 	const monitorAudioRef = useRef(null);
 	const vinhetaPreviewAudioRef = useRef(null);
+	const vinhetaTimerIntervalRef = useRef(null);
+	const fimVinhetaNoArMsRef = useRef(0);
 	const urlFaixaNoArRef = useRef("");
 	const proximaNomeServidorRef = useRef("");
 	const temAgendamentoExplicitoRef = useRef(false);
@@ -754,6 +758,80 @@ export const useLocutorMesa = () => {
 		}
 	}, [ouvirVinhetaNoCanal, pararEscutaVinheta]);
 
+	const iniciarCronometroVinhetaNoAr = useCallback((alvo, urlVinheta) => {
+		if (vinhetaTimerIntervalRef.current) {
+			clearInterval(vinhetaTimerIntervalRef.current);
+			vinhetaTimerIntervalRef.current = null;
+		}
+
+		const inicioMs = Date.now();
+		let duracaoSeg = 10;
+
+		const previewAudio = vinhetaPreviewAudioRef.current;
+		if (
+			previewAudio &&
+			previewAudio.src &&
+			urlVinheta &&
+			previewAudio.src.includes(urlVinheta.split("/").pop()) &&
+			Number.isFinite(previewAudio.duration) &&
+			previewAudio.duration > 0
+		) {
+			duracaoSeg = Math.max(1, Math.ceil(previewAudio.duration));
+		}
+
+		fimVinhetaNoArMsRef.current = inicioMs + duracaoSeg * 1000;
+		setVinhetaNoArId(alvo.id);
+		setVinhetaNoArNome(alvo.nome || "Vinheta");
+		setTempoRestanteVinhetaSeg(duracaoSeg);
+
+		if (urlVinheta) {
+			const probe = new Audio();
+			probe.preload = "metadata";
+			probe.muted = true;
+			probe.src = urlVinheta;
+			probe.addEventListener(
+				"loadedmetadata",
+				() => {
+					if (Number.isFinite(probe.duration) && probe.duration > 0) {
+						const durRealMs = Math.ceil(probe.duration * 1000);
+						fimVinhetaNoArMsRef.current = inicioMs + durRealMs;
+						const rest = Math.max(
+							0,
+							Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000),
+						);
+						setTempoRestanteVinhetaSeg(rest);
+					}
+				},
+				{ once: true },
+			);
+		}
+
+		vinhetaTimerIntervalRef.current = setInterval(() => {
+			const restante = Math.max(
+				0,
+				Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000),
+			);
+			setTempoRestanteVinhetaSeg(restante);
+
+			if (restante <= 0) {
+				if (vinhetaTimerIntervalRef.current) {
+					clearInterval(vinhetaTimerIntervalRef.current);
+					vinhetaTimerIntervalRef.current = null;
+				}
+				setVinhetaNoArId(null);
+				setVinhetaNoArNome("");
+			}
+		}, 250);
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			if (vinhetaTimerIntervalRef.current) {
+				clearInterval(vinhetaTimerIntervalRef.current);
+			}
+		};
+	}, []);
+
 	const liberarVinhetaNoAr = useCallback(
 		async (vinhetaAlvo = null) => {
 			const alvo = vinhetaAlvo || vinhetaSelecionadaRef.current;
@@ -770,7 +848,8 @@ export const useLocutorMesa = () => {
 			vinhetaSelecionadaRef.current = alvo;
 			setVinhetaSelecionada(alvo);
 
-			// Se estava apenas na pré-escuta, encerra ou reinicia sincronizado com o ar
+			const urlVinheta = resolveRadioAssetUrl(alvo.url || alvo.arquivo || "");
+
 			try {
 				await updateMesa({
 					vinheta_ativa: {
@@ -781,10 +860,7 @@ export const useLocutorMesa = () => {
 					},
 				});
 
-				setVinhetaNoArId(alvo.id);
-				setTimeout(() => {
-					setVinhetaNoArId((atual) => (atual === alvo.id ? null : atual));
-				}, 4000);
+				iniciarCronometroVinhetaNoAr(alvo, urlVinheta);
 			} catch {
 				setAvisoModal({
 					icone: "⚠️",
@@ -793,7 +869,7 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[],
+		[iniciarCronometroVinhetaNoAr],
 	);
 
 	const atualizarAcervo = useCallback(async () => {
@@ -942,6 +1018,15 @@ export const useLocutorMesa = () => {
 		"0",
 	);
 
+	const minVinheta = String(Math.floor(tempoRestanteVinhetaSeg / 60)).padStart(
+		2,
+		"0",
+	);
+	const segVinheta = String(Math.floor(tempoRestanteVinhetaSeg % 60)).padStart(
+		2,
+		"0",
+	);
+
 	return {
 		aoVivo,
 		faderMic,
@@ -952,12 +1037,15 @@ export const useLocutorMesa = () => {
 		musicaAtual,
 		proximaAtual,
 		tempoRestanteFormatado: `${minutosRestantes}:${segundosRestantes}`,
+		tempoRestanteVinhetaSeg,
+		tempoRestanteVinhetaFormatado: `${minVinheta}:${segVinheta}`,
 		transicaoEmAndamento,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,
 		vinhetaSelecionada,
 		vinhetaNoArId,
+		vinhetaNoArNome,
 		atualizandoAcervo,
 		avisoModal,
 		confirmacaoModal,

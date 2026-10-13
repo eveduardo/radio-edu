@@ -22,6 +22,9 @@ const LocutorPage = () => {
 		mapaVinhetas,
 		vinhetaSelecionada,
 		vinhetaNoArId,
+		vinhetaNoArNome,
+		tempoRestanteVinhetaSeg,
+		tempoRestanteVinhetaFormatado,
 		atualizandoAcervo,
 		avisoModal,
 		confirmacaoModal,
@@ -191,7 +194,7 @@ const LocutorPage = () => {
 						<div className={styles.faderComVuRow}>
 							<VerticalVuMeter
 								mode="vinheta"
-								aoVivo={ouvindoVinheta}
+								aoVivo={ouvindoVinheta || tempoRestanteVinhetaSeg > 0}
 								faderValue={faderVinheta}
 							/>
 							<div className={styles.faderSlot}>
@@ -209,14 +212,23 @@ const LocutorPage = () => {
 						</div>
 
 						<div
-							className={styles.infoCanalMusica}
+							className={clsx(
+								styles.infoCanalMusica,
+								tempoRestanteVinhetaSeg > 0 && styles.infoCanalVinhetaNoAr,
+							)}
 							title={
-								vinhetaSelecionada
-									? `Selecionada: ${vinhetaSelecionada.nome}`
-									: "Pré-escuta exclusiva do locutor"
+								tempoRestanteVinhetaSeg > 0
+									? `Vinheta no ar: ${vinhetaNoArNome || vinhetaSelecionada?.nome || ""} (${tempoRestanteVinhetaFormatado} restantes)`
+									: vinhetaSelecionada
+										? `Selecionada: ${vinhetaSelecionada.nome}`
+										: "Pré-escuta exclusiva do locutor"
 							}
 						>
-							{vinhetaSelecionada ? vinhetaSelecionada.nome : "PRÉ-ESCUTA"}
+							{tempoRestanteVinhetaSeg > 0
+								? `⏱ ${tempoRestanteVinhetaFormatado} • ${vinhetaNoArNome || vinhetaSelecionada?.nome || "NO AR"}`
+								: vinhetaSelecionada
+									? vinhetaSelecionada.nome
+									: "PRÉ-ESCUTA"}
 						</div>
 						<div className={styles.botoesCanalVinheta}>
 							<button
@@ -235,18 +247,15 @@ const LocutorPage = () => {
 								type="button"
 								className={clsx(
 									styles.btnCanalVinhetaAr,
-									vinhetaSelecionada &&
-										vinhetaNoArId === vinhetaSelecionada.id &&
-										styles.ativo,
+									tempoRestanteVinhetaSeg > 0 && styles.ativo,
 								)}
 								onClick={() => liberarVinhetaNoAr()}
 								title="Liberar vinheta selecionada para o AR"
 							>
-								<span>📡</span>
+								<span>{tempoRestanteVinhetaSeg > 0 ? "⏱" : "📡"}</span>
 								<span>
-									{vinhetaSelecionada &&
-									vinhetaNoArId === vinhetaSelecionada.id
-										? "NO AR!"
+									{tempoRestanteVinhetaSeg > 0
+										? tempoRestanteVinhetaFormatado
 										: "AR"}
 								</span>
 							</button>
@@ -259,6 +268,14 @@ const LocutorPage = () => {
 					<div className={styles.statusLinhaTopo}>
 						<span>● No Ar Agora</span>
 						<div className={styles.statusTopoRight}>
+							{tempoRestanteVinhetaSeg > 0 && (
+								<span
+									className={styles.badgeTempoVinheta}
+									title={`Vinheta tocando no ar: ${vinhetaNoArNome}`}
+								>
+									📢 Vinheta: {tempoRestanteVinhetaFormatado}
+								</span>
+							)}
 							<span className={styles.badgeTempoRestante}>
 								{tempoRestanteFormatado}
 							</span>
@@ -644,7 +661,11 @@ const LocutorPage = () => {
 												onClick={() => liberarVinhetaNoAr(v)}
 												title="Liberar esta vinheta imediatamente para o AR"
 											>
-												{estaNoArEsta ? "📡 No Ar!" : "📡 Pro Ar"}
+												{estaNoArEsta && tempoRestanteVinhetaSeg > 0
+													? `⏱ ${tempoRestanteVinhetaFormatado}`
+													: estaNoArEsta
+														? "📡 No Ar!"
+														: "📡 Pro Ar"}
 											</button>
 										</div>
 									</div>
