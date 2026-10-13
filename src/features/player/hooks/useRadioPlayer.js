@@ -25,10 +25,8 @@ export const useRadioPlayer = () => {
 
 	const audioCtxRef = useRef(null);
 	const analyserRef = useRef(null);
-	const gainNodeMusicaRef = useRef(null);
 	const gainNodeVozRef = useRef(null);
 	const dataArrayRef = useRef(null);
-	const sourceNodeRef = useRef(null);
 	const sourceNodeVozRef = useRef(null);
 
 	const estaTocandoRef = useRef(estaTocando);
@@ -38,6 +36,8 @@ export const useRadioPlayer = () => {
 	volumeMasterRef.current = volumeMaster;
 
 	const urlFaixaAtualRef = useRef("");
+	const proximaUrlRef = useRef("");
+	const vinhetaEmExecucaoRef = useRef(false);
 	const ultimaHoraTocadaRef = useRef("");
 	const filaAudioVozRef = useRef([]);
 	const tocandoVozRef = useRef(false);
@@ -72,42 +72,30 @@ export const useRadioPlayer = () => {
 				? Math.max(0, Math.min(1, estadoMesa.mic_volume))
 				: 1.0;
 
+		const duckVinheta = vinhetaEmExecucaoRef.current ? 0.2 : 1.0;
 		// CH-1 (Mic) e CH-2 (Música) seguem a mesma regra e nunca ultrapassam o volume Master do ouvinte
-		const volumeFinalMusica = Math.min(volMaster, volMaster * volMusicaMesa);
-		const volumeFinalMic = Math.min(volMaster, volMaster * volMicMesa);
+		const volumeFinalMusica = Math.max(
+			0,
+			Math.min(1, volMaster * volMusicaMesa * duckVinheta),
+		);
+		const volumeFinalMic = Math.max(0, Math.min(1, volMaster * volMicMesa));
 
-		const ctx = audioCtxRef.current;
-		const gainNodeMusica = gainNodeMusicaRef.current;
-		const gainNodeVoz = gainNodeVozRef.current;
 		const player = playerRef.current;
-		const playerVoz = playerVozRef.current;
-
-		if (
-			gainNodeMusica &&
-			sourceNodeRef.current &&
-			ctx &&
-			ctx.state === "running"
-		) {
-			gainNodeMusica.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
-			if (player) {
-				try {
-					player.volume = 1;
-				} catch {
-					// Ignora erro em dispositivos com volume fixo
-				}
-			}
-		} else if (player) {
+		if (player) {
 			try {
 				player.volume = volumeFinalMusica;
 			} catch {
-				// Ignora erro em dispositivos com volume fixo
+				// Ignora erro em dispositivos com volume fixo por botões físicos (ex.: iOS)
 			}
 		}
 
+		const ctx = audioCtxRef.current;
+		const gainNodeVoz = gainNodeVozRef.current;
 		if (gainNodeVoz && ctx && ctx.state === "running") {
 			gainNodeVoz.gain.setValueAtTime(volumeFinalMic, ctx.currentTime);
 		}
 
+		const playerVoz = playerVozRef.current;
 		if (playerVoz) {
 			try {
 				playerVoz.volume = volumeFinalMic;
@@ -115,17 +103,24 @@ export const useRadioPlayer = () => {
 				// Ignora erro em dispositivos com volume fixo
 			}
 		}
+
+		const playerHora = playerHoraRef.current;
+		if (playerHora) {
+			try {
+				playerHora.volume = volMaster;
+			} catch {
+				// Ignora erro em dispositivos com volume fixo
+			}
+		}
 	}, []);
 
 	/**
-	 * Inicializa o AudioContext e só conecta o MediaElementSource do player principal
-	 * quando o contexto estiver efetivamente em estado "running", evitando silenciar o <audio>.
+	 * Inicializa o AudioContext para canais de locução Web Audio e analyser do VU Meter.
+	 * O player principal de música permanece como <audio> nativo HTML5, garantindo
+	 * execução ininterrupta em segundo plano no celular quando a tela apaga.
 	 */
 	const inicializarAudioContext = useCallback(() => {
 		try {
-			const player = playerRef.current;
-			if (!player) return;
-
 			if (!audioCtxRef.current) {
 				const AudioCtx = window.AudioContext || window.webkitAudioContext;
 				if (!AudioCtx) return;
@@ -135,52 +130,21 @@ export const useRadioPlayer = () => {
 				analyser.fftSize = 64;
 				analyser.smoothingTimeConstant = 0.75;
 
-				const gainNodeMusica = ctx.createGain();
 				const gainNodeVoz = ctx.createGain();
-
-				gainNodeMusica.connect(analyser);
 				gainNodeVoz.connect(analyser);
 				analyser.connect(ctx.destination);
 
 				audioCtxRef.current = ctx;
 				analyserRef.current = analyser;
-				gainNodeMusicaRef.current = gainNodeMusica;
 				gainNodeVozRef.current = gainNodeVoz;
 				dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
 			}
 
 			const ctx = audioCtxRef.current;
-			const conectarPlayerSeRunning = () => {
-				if (
-					ctx &&
-					ctx.state === "running" &&
-					playerRef.current &&
-					!sourceNodeRef.current &&
-					gainNodeMusicaRef.current
-				) {
-					try {
-						const sourceMusica = ctx.createMediaElementSource(
-							playerRef.current,
-						);
-						sourceMusica.connect(gainNodeMusicaRef.current);
-						sourceNodeRef.current = sourceMusica;
-					} catch {
-						// Ignora caso já esteja conectado
-					}
-				}
-				aplicarVolumesMesa();
-			};
-
-			if (ctx.state === "suspended") {
-				ctx
-					.resume()
-					.then(conectarPlayerSeRunning)
-					.catch(() => {});
-			} else {
-				conectarPlayerSeRunning();
+			if (ctx && ctx.state === "suspended") {
+				ctx.resume().catch(() => {});
 			}
-
-			ctx.onstatechange = conectarPlayerSeRunning;
+			aplicarVolumesMesa();
 		} catch {
 			// Fallback silencioso caso o navegador bloqueie Web Audio
 		}
@@ -267,20 +231,20 @@ export const useRadioPlayer = () => {
 			if (!playerHora) return;
 
 			ultimaHoraTocadaRef.current = horario;
-			const ctx = audioCtxRef.current;
-			const gainNode = gainNodeMusicaRef.current;
-
-			if (gainNode && ctx && ctx.state === "running") {
-				gainNode.gain.setValueAtTime(
-					0.2 * volumeMasterRef.current,
-					ctx.currentTime,
-				);
-			} else if (playerRef.current) {
-				playerRef.current.volume = 0.2 * volumeMasterRef.current;
+			if (playerRef.current) {
+				try {
+					playerRef.current.volume = 0.2 * volumeMasterRef.current;
+				} catch {
+					// ignore
+				}
 			}
 
 			playerHora.src = resolveRadioAssetUrl(arquivo);
-			playerHora.volume = volumeMasterRef.current;
+			try {
+				playerHora.volume = volumeMasterRef.current;
+			} catch {
+				// ignore
+			}
 			playerHora.play().catch(() => {});
 
 			playerHora.onended = () => {
@@ -329,6 +293,9 @@ export const useRadioPlayer = () => {
 				}
 
 				setProximaFaixa(`A seguir: ${data.proxima_faixa?.nome || "--"}`);
+				if (data.proxima_faixa?.url) {
+					proximaUrlRef.current = resolveRadioAssetUrl(data.proxima_faixa.url);
+				}
 
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual?.url || "");
 				if (!novaUrl) return data;
@@ -460,22 +427,18 @@ export const useRadioPlayer = () => {
 		try {
 			const passos = 7;
 			const tempoPasso = 90;
-			const ctx = audioCtxRef.current;
-			const gainNode = gainNodeMusicaRef.current;
 			const player = playerRef.current;
-
-			const volAtual =
-				gainNode && ctx && ctx.state === "running"
-					? gainNode.gain.value
-					: player?.volume ?? 1;
+			const volAtual = player?.volume ?? 1;
 
 			for (let i = 1; i <= passos; i++) {
 				await new Promise((r) => setTimeout(r, tempoPasso));
 				const v = Math.max(0, volAtual - (volAtual / passos) * i);
-				if (gainNode && ctx && ctx.state === "running") {
-					gainNode.gain.setValueAtTime(v, ctx.currentTime);
-				} else if (player) {
-					player.volume = v;
+				if (player) {
+					try {
+						player.volume = v;
+					} catch {
+						// ignore
+					}
 				}
 			}
 
@@ -493,10 +456,12 @@ export const useRadioPlayer = () => {
 					),
 				);
 				const v = Math.min(volAlvo, (volAlvo / passos) * i);
-				if (gainNode && ctx && ctx.state === "running") {
-					gainNode.gain.setValueAtTime(v, ctx.currentTime);
-				} else if (player) {
-					player.volume = v;
+				if (player) {
+					try {
+						player.volume = v;
+					} catch {
+						// ignore
+					}
 				}
 			}
 		} finally {
@@ -750,6 +715,7 @@ export const useRadioPlayer = () => {
 				const playerVinheta = playerVinhetaRef.current;
 
 				if (dados.vinheta_ativa.acao === "parar") {
+					vinhetaEmExecucaoRef.current = false;
 					playerVinheta?.pause();
 					aplicarVolumesMesa();
 				} else {
@@ -757,6 +723,9 @@ export const useRadioPlayer = () => {
 						dados.vinheta_ativa.url || dados.vinheta_ativa.arquivo || "";
 					const urlVinheta = resolveRadioAssetUrl(caminhoVinheta);
 					if (playerVinheta && urlVinheta && estaTocandoRef.current) {
+						vinhetaEmExecucaoRef.current = true;
+						aplicarVolumesMesa();
+
 						playerVinheta.src = urlVinheta;
 						try {
 							playerVinheta.volume = Math.max(
@@ -767,57 +736,16 @@ export const useRadioPlayer = () => {
 							// ignore
 						}
 
-						const duckMusicaOuvinte = () => {
-							const ctx = audioCtxRef.current;
-							const gainNode = gainNodeMusicaRef.current;
-							const player = playerRef.current;
-							const volBase = Math.max(0, Math.min(1, volumeMasterRef.current));
-
-							if (gainNode && ctx && ctx.state === "running") {
-								gainNode.gain.setValueAtTime(0.2 * volBase, ctx.currentTime);
-							} else if (player) {
-								try {
-									player.volume = 0.2 * volBase;
-								} catch {
-									// ignore
-								}
-							}
-						};
-
 						const restaurarMusicaOuvinte = () => {
+							vinhetaEmExecucaoRef.current = false;
 							aplicarVolumesMesa();
 						};
 
 						playerVinheta.onended = restaurarMusicaOuvinte;
 						playerVinheta.onerror = restaurarMusicaOuvinte;
 
-						duckMusicaOuvinte();
-
-						playerVinheta.play().catch(async () => {
-							// Fallback via Web Audio API caso o elemento <audio> secundário seja bloqueado no celular
-							const ctx = audioCtxRef.current;
-							if (ctx && ctx.state === "running" && analyserRef.current) {
-								try {
-									const resp = await fetch(urlVinheta);
-									const buf = await resp.arrayBuffer();
-									const audioBuf = await ctx.decodeAudioData(buf);
-									const src = ctx.createBufferSource();
-									const gain = ctx.createGain();
-									gain.gain.value = Math.max(
-										0,
-										Math.min(1, volumeMasterRef.current),
-									);
-									src.buffer = audioBuf;
-									src.connect(gain);
-									gain.connect(analyserRef.current);
-									src.onended = restaurarMusicaOuvinte;
-									src.start(0);
-								} catch {
-									restaurarMusicaOuvinte();
-								}
-							} else {
-								restaurarMusicaOuvinte();
-							}
+						playerVinheta.play().catch(() => {
+							restaurarMusicaOuvinte();
 						});
 					}
 				}
@@ -857,16 +785,6 @@ export const useRadioPlayer = () => {
 		const wakeVideo = wakeVideoRef.current;
 		const player = playerRef.current;
 
-		const aoTimeUpdateWakeVideo = () => {
-			if (wakeVideo && wakeVideo.currentTime > 0.5) {
-				try {
-					wakeVideo.currentTime = Math.random() * 0.25;
-				} catch {
-					// ignore
-				}
-			}
-		};
-
 		const liberarWakeLock = () => {
 			if (wakeLockRef.current) {
 				wakeLockRef.current.release().catch(() => {});
@@ -878,21 +796,25 @@ export const useRadioPlayer = () => {
 		};
 
 		const manterTelaAcesa = async () => {
-			if (!estaTocandoRef.current || document.visibilityState !== "visible") {
+			if (!estaTocandoRef.current) {
 				return;
 			}
 
-			// 1. Mantém o vídeo NoSleep ativo (funciona em HTTP e sem exigir clique quando muted+playsInline)
+			// 1. Mantém o vídeo NoSleep ativo em loop contínuo (mantém tela e processos acordados em HTTP e celular)
 			if (wakeVideo) {
 				wakeVideo.muted = true;
 				wakeVideo.playsInline = true;
+				wakeVideo.loop = true;
 				if (wakeVideo.paused) {
 					wakeVideo.play().catch(() => {});
 				}
 			}
 
 			// 2. Solicita WakeLock nativa caso o navegador disponha da API (HTTPS / localhost)
-			if ("wakeLock" in navigator) {
+			if (
+				"wakeLock" in navigator &&
+				document.visibilityState === "visible"
+			) {
 				if (!wakeLockRef.current || wakeLockRef.current.released) {
 					try {
 						const sentinel = await navigator.wakeLock.request("screen");
@@ -903,7 +825,7 @@ export const useRadioPlayer = () => {
 							}
 						});
 					} catch {
-						// Ignora caso exija gesto adicional
+						// Ignora caso exija contexto seguro ou gesto
 					}
 				}
 			}
@@ -914,8 +836,6 @@ export const useRadioPlayer = () => {
 				manterTelaAcesa();
 			}
 		};
-
-		wakeVideo?.addEventListener("timeupdate", aoTimeUpdateWakeVideo);
 
 		if (estaTocando) {
 			manterTelaAcesa();
@@ -930,18 +850,16 @@ export const useRadioPlayer = () => {
 			});
 			document.addEventListener("keydown", manterTelaAcesa, { passive: true });
 			player?.addEventListener("playing", manterTelaAcesa);
-			player?.addEventListener("timeupdate", manterTelaAcesa);
 		} else {
 			liberarWakeLock();
 		}
 
 		const keepAliveInterval = estaTocando
-			? setInterval(manterTelaAcesa, 5000)
+			? setInterval(manterTelaAcesa, 10000)
 			: null;
 
 		return () => {
 			if (keepAliveInterval) clearInterval(keepAliveInterval);
-			wakeVideo?.removeEventListener("timeupdate", aoTimeUpdateWakeVideo);
 			document.removeEventListener("visibilitychange", aoMudarVisibilidade);
 			window.removeEventListener("focus", manterTelaAcesa);
 			document.removeEventListener("touchstart", manterTelaAcesa);
@@ -949,7 +867,6 @@ export const useRadioPlayer = () => {
 			document.removeEventListener("pointerdown", manterTelaAcesa);
 			document.removeEventListener("keydown", manterTelaAcesa);
 			player?.removeEventListener("playing", manterTelaAcesa);
-			player?.removeEventListener("timeupdate", manterTelaAcesa);
 			liberarWakeLock();
 		};
 	}, [estaTocando]);
@@ -971,18 +888,39 @@ export const useRadioPlayer = () => {
 		}
 	}, [estaTocando, nomeOuvinte, proximaFaixa, tituloMusica]);
 
-	const handleTrackEnded = useCallback(async () => {
+	const handleTrackEnded = useCallback(() => {
 		if (emTransicaoSuaveRef.current) return;
+
+		const player = playerRef.current;
+		const proximaUrl = proximaUrlRef.current;
+
+		// 1. Transição síncrona imediata para manter a reprodução ativa em segundo plano no celular
+		// O navegador mobile exige chamada síncrona no evento ended para não bloquear como autoplay restrito
+		if (player && proximaUrl && estaTocandoRef.current) {
+			urlFaixaAtualRef.current = proximaUrl;
+			player.muted = false;
+			player.src = proximaUrl;
+			aplicarVolumesMesa();
+			player.play().catch(() => {});
+		}
+
 		setStatusTexto("Carregando próxima música...");
 
-		const urlAnterior = urlFaixaAtualRef.current;
-		const data = await sincronizarRadio(false);
-		const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
-
-		if (!urlServidor || urlServidor === urlAnterior) {
-			await sincronizarRadio(true, { recarregarAudio: true });
-		}
-	}, [sincronizarRadio]);
+		// 2. Consulta o servidor para atualizar títulos, pedidos atendidos e metadados
+		sincronizarRadio(false).then((data) => {
+			const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
+			if (
+				player &&
+				urlServidor &&
+				urlServidor !== urlFaixaAtualRef.current &&
+				estaTocandoRef.current
+			) {
+				urlFaixaAtualRef.current = urlServidor;
+				player.src = urlServidor;
+				player.play().catch(() => {});
+			}
+		});
+	}, [aplicarVolumesMesa, sincronizarRadio]);
 
 	const handleTrackError = useCallback(() => {
 		if (emTransicaoSuaveRef.current) return;

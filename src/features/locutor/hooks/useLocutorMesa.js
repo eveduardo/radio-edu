@@ -813,10 +813,10 @@ export const useLocutorMesa = () => {
 
 	const duckarVolumeMusica = useCallback(async () => {
 		const volAtual = faderMusicaRef.current;
-		if (volAtual <= 0.2) return;
 		if (faderMusicaAnteriorRef.current === null) {
-			faderMusicaAnteriorRef.current = volAtual;
+			faderMusicaAnteriorRef.current = volAtual > 0.2 ? volAtual : 1.0;
 		}
+		if (volAtual <= 0.2) return;
 
 		const volAlvo = 0.2;
 		const passos = 4;
@@ -829,12 +829,17 @@ export const useLocutorMesa = () => {
 			setFaderMusica(v);
 			aplicarVolumeMonitor(v);
 		}
+		faderMusicaRef.current = volAlvo;
+		setFaderMusica(volAlvo);
+		aplicarVolumeMonitor(volAlvo);
 		sincronizarMesaFirebase(true);
 	}, [aplicarVolumeMonitor, sincronizarMesaFirebase]);
 
 	const restaurarVolumeMusica = useCallback(async () => {
-		if (faderMusicaAnteriorRef.current === null) return;
-		const volAlvo = faderMusicaAnteriorRef.current;
+		const volAlvo =
+			faderMusicaAnteriorRef.current !== null
+				? faderMusicaAnteriorRef.current
+				: 1.0;
 		faderMusicaAnteriorRef.current = null;
 		const volAtual = faderMusicaRef.current;
 
@@ -848,8 +853,19 @@ export const useLocutorMesa = () => {
 			setFaderMusica(v);
 			aplicarVolumeMonitor(v);
 		}
-		sincronizarMesaFirebase(true);
-	}, [aplicarVolumeMonitor, sincronizarMesaFirebase]);
+		faderMusicaRef.current = volAlvo;
+		setFaderMusica(volAlvo);
+		aplicarVolumeMonitor(volAlvo);
+
+		// Notifica o Firebase com o volume restaurado e finaliza a vinheta no ar
+		updateMesa({
+			ao_vivo: aoVivoRef.current,
+			mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
+			musica_tocando: !musicaPausadaRef.current,
+			musica_volume: volAlvo,
+			vinheta_ativa: { acao: "parar", timestamp: Date.now() },
+		}).catch(() => {});
+	}, [aplicarVolumeMonitor]);
 
 	const iniciarCronometroVinhetaNoAr = useCallback((alvo, urlVinheta) => {
 		if (vinhetaTimerIntervalRef.current) {
@@ -969,6 +985,7 @@ export const useLocutorMesa = () => {
 						arquivo: alvo.arquivo,
 						url: alvo.url || alvo.arquivo,
 						nome: alvo.nome,
+						acao: "tocar",
 						timestamp: Date.now(),
 					},
 				});

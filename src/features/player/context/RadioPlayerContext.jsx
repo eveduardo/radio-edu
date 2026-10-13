@@ -43,13 +43,13 @@ export const RadioPlayerProvider = ({ children }) => {
 				tabIndex={-1}
 				style={{
 					position: "fixed",
-					bottom: "1px",
-					right: "1px",
-					width: "2px",
-					height: "2px",
-					opacity: 0.01,
+					bottom: "0px",
+					right: "0px",
+					width: "8px",
+					height: "8px",
+					opacity: 0.05,
 					pointerEvents: "none",
-					zIndex: 95,
+					zIndex: 1,
 				}}
 			>
 				<source
