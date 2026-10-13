@@ -257,8 +257,16 @@
 	color: #f3e8ff;
 }
 
-.btnCanalVinhetaAr:hover {
+.btnCanalVinhetaAr:hover:not(:disabled) {
 	filter: brightness(1.15);
+}
+
+.btnCanalVinhetaCue:disabled,
+.btnCanalVinhetaAr:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	filter: grayscale(0.6);
+	box-shadow: none;
 }
 
 .ativo {

@@ -247,7 +247,7 @@ const LocutorPage = () => {
 							title={
 								vinhetaSelecionada
 									? `Selecionada: ${vinhetaSelecionada.nome}`
-									: "Pré-escuta exclusiva do locutor"
+									: "Nenhuma vinheta no cache (PRÉ-ESCUTA)"
 							}
 						>
 							{vinhetaSelecionada ? vinhetaSelecionada.nome : "PRÉ-ESCUTA"}
@@ -260,7 +260,12 @@ const LocutorPage = () => {
 									ouvindoVinheta && styles.ativoRetorno,
 								)}
 								onClick={alternarEscutaVinhetaCanal}
-								title="Ouvir / Parar vinheta apenas para o locutor (CH-3)"
+								disabled={!vinhetaSelecionada && !ouvindoVinheta}
+								title={
+									vinhetaSelecionada
+										? "Ouvir / Parar vinheta apenas para o locutor (CH-3)"
+										: "Nenhuma vinheta no cache. Escolha uma nas pastas abaixo."
+								}
 							>
 								<span>{ouvindoVinheta ? "⏹" : "🎧"}</span>
 								<span>{ouvindoVinheta ? "PARAR" : "OUVIR"}</span>
@@ -274,7 +279,12 @@ const LocutorPage = () => {
 										styles.ativo,
 								)}
 								onClick={() => liberarVinhetaNoAr()}
-								title="Liberar vinheta selecionada para o AR"
+								disabled={!vinhetaSelecionada && !vinhetaNoArId}
+								title={
+									vinhetaSelecionada
+										? "Liberar vinheta selecionada para o AR"
+										: "Nenhuma vinheta no cache. Escolha uma nas pastas abaixo."
+								}
 							>
 								<span>📡</span>
 								<span>
@@ -672,7 +682,10 @@ const LocutorPage = () => {
 													styles.btnVinhetaOuvir,
 													estaOuvindoEsta && styles.btnVinhetaOuvirAtivo,
 												)}
-												onClick={() => ouvirVinhetaNoCanal(v)}
+												onClick={() => {
+													setVinhetaCategoriaAtiva(null);
+													ouvirVinhetaNoCanal(v);
+												}}
 												title="Pré-escutar apenas para o locutor (CH-3)"
 											>
 												{estaOuvindoEsta ? "⏹ Parar (CH-3)" : "🎧 Ouvir (CH-3)"}
@@ -683,7 +696,10 @@ const LocutorPage = () => {
 													styles.btnAcervoTocarAgora,
 													estaNoArEsta && styles.btnVinhetaNoArAtivo,
 												)}
-												onClick={() => liberarVinhetaNoAr(v)}
+												onClick={() => {
+													setVinhetaCategoriaAtiva(null);
+													liberarVinhetaNoAr(v);
+												}}
 												title="Liberar esta vinheta imediatamente para o AR"
 											>
 												{estaNoArEsta ? "📡 No Ar!" : "📡 Pro Ar"}

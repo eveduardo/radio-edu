@@ -730,15 +730,6 @@ export const useLocutorMesa = () => {
 		try {
 			const vinhetas = await fetchVinhetasCatalog();
 			setMapaVinhetas(vinhetas);
-
-			if (!vinhetaSelecionadaRef.current) {
-				const primeiraLista = Object.values(vinhetas).find(
-					(arr) => Array.isArray(arr) && arr.length > 0,
-				);
-				if (primeiraLista?.[0]) {
-					setVinhetaSelecionada(primeiraLista[0]);
-				}
-			}
 		} catch {
 			setMapaVinhetas({});
 		}
@@ -755,12 +746,15 @@ export const useLocutorMesa = () => {
 			audio.pause();
 			try {
 				audio.currentTime = 0;
+				audio.src = "";
 			} catch {
 				// ignore
 			}
 		}
 		ouvindoVinhetaRef.current = false;
 		setOuvindoVinheta(false);
+		vinhetaSelecionadaRef.current = null;
+		setVinhetaSelecionada(null);
 	}, []);
 
 	const ouvirVinhetaNoCanal = useCallback(
@@ -877,6 +871,9 @@ export const useLocutorMesa = () => {
 				}
 				setVinhetaNoArId(null);
 				setVinhetaNoArNome("");
+				setTempoRestanteVinhetaSeg(0);
+				vinhetaSelecionadaRef.current = null;
+				setVinhetaSelecionada(null);
 			}
 		}, 250);
 	}, []);
@@ -900,6 +897,22 @@ export const useLocutorMesa = () => {
 						"Escolha uma vinheta nas subpastas abaixo antes de liberar para o ar.",
 				});
 				return;
+			}
+
+			// Se a vinheta estava tocando no retorno/fone do locutor, interrompe a pré-escuta
+			if (ouvindoVinhetaRef.current) {
+				const audio = vinhetaPreviewAudioRef.current;
+				if (audio) {
+					audio.pause();
+					try {
+						audio.currentTime = 0;
+						audio.src = "";
+					} catch {
+						// ignore
+					}
+				}
+				ouvindoVinhetaRef.current = false;
+				setOuvindoVinheta(false);
 			}
 
 			vinhetaSelecionadaRef.current = alvo;
