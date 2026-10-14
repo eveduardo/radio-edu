@@ -56,6 +56,9 @@ const LocutorPage = () => {
 		agendarFaixaAcervo,
 		dispararRecadoComIA,
 		gerandoVozIaChave,
+		blocoTrinca,
+		autoTrincaHabilitado,
+		alternarAutoTrinca,
 	} = useLocutorMesa();
 
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
@@ -356,6 +359,28 @@ const LocutorPage = () => {
 					</div>
 					<div className={styles.proximaProgramadaLbl} title={proximaAtual}>
 						{proximaAtual}
+					</div>
+					<div className={styles.linhaBlocoTrinca}>
+						<span className={styles.textoBlocoTrinca}>
+							📻 Bloco de Músicas:{" "}
+							<strong
+								className={
+									blocoTrinca?.contagem === 0 && blocoTrinca?.historico?.length
+										? styles.destaqueTrincaVerde
+										: styles.destaqueTrincaAzul
+								}
+							>
+								{blocoTrinca?.contagem || 0} de 3 tocadas
+							</strong>
+						</span>
+						<label className={styles.labelAutoTrinca}>
+							<input
+								type="checkbox"
+								checked={autoTrincaHabilitado}
+								onChange={(e) => alternarAutoTrinca(e.target.checked)}
+							/>
+							<span>Locução IA a cada 3 músicas</span>
+						</label>
 					</div>
 				</div>
 

@@ -1034,3 +1034,37 @@
 	width: 100%;
 }
 
+.linhaBlocoTrinca {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 6px;
+	padding-top: 6px;
+	border-top: 1px dashed #1f293d;
+	font-size: 10px;
+}
+
+.textoBlocoTrinca {
+	color: #94a3b8;
+}
+
+.destaqueTrincaAzul {
+	color: #38bdf8;
+	font-weight: 700;
+}
+
+.destaqueTrincaVerde {
+	color: #10b981;
+	font-weight: 700;
+}
+
+.labelAutoTrinca {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+	color: #cbd5e1;
+	font-size: 10px;
+	font-weight: 600;
+}
+

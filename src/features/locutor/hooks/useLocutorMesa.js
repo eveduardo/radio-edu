@@ -106,6 +106,16 @@ export const useLocutorMesa = () => {
 	const [tempoRestanteVinhetaSeg, setTempoRestanteVinhetaSeg] = useState(0);
 	const [atualizandoAcervo, setAtualizandoAcervo] = useState(false);
 	const [gerandoVozIaChave, setGerandoVozIaChave] = useState(null);
+	const [blocoTrinca, setBlocoTrinca] = useState({
+		contagem: 0,
+		total: 3,
+		historico: [],
+	});
+	const [autoTrincaHabilitado, setAutoTrincaHabilitado] = useState(true);
+	const autoTrincaHabilitadoRef = useRef(true);
+	autoTrincaHabilitadoRef.current = autoTrincaHabilitado;
+	const ultimoAnuncioTrincaRef = useRef("");
+	const liberarVinhetaNoArRef = useRef(null);
 
 	const [avisoModal, setAvisoModal] = useState(null);
 	const [confirmacaoModal, setConfirmacaoModal] = useState(null);
@@ -469,6 +479,29 @@ export const useLocutorMesa = () => {
 				if (typeof data.pausado === "boolean") {
 					musicaPausadaRef.current = data.pausado;
 					setMusicaPausada(data.pausado);
+				}
+
+				if (data.bloco_trinca) {
+					setBlocoTrinca({
+						contagem: data.bloco_trinca.contagem || 0,
+						total: data.bloco_trinca.total || 3,
+						historico: data.bloco_trinca.historico || [],
+					});
+
+					if (
+						data.bloco_trinca.anuncio_pendente &&
+						data.bloco_trinca.anuncio_pendente !== ultimoAnuncioTrincaRef.current
+					) {
+						if (autoTrincaHabilitadoRef.current && liberarVinhetaNoArRef.current) {
+							ultimoAnuncioTrincaRef.current = data.bloco_trinca.anuncio_pendente;
+							liberarVinhetaNoArRef.current({
+								id: "trinca_" + Date.now(),
+								nome: "Trinca Flash (Locução)",
+								arquivo: data.bloco_trinca.anuncio_pendente,
+								url: data.bloco_trinca.anuncio_pendente,
+							});
+						}
+					}
 				}
 
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual.url || "");
@@ -980,6 +1013,12 @@ export const useLocutorMesa = () => {
 		},
 		[iniciarCronometroVinhetaNoAr],
 	);
+	liberarVinhetaNoArRef.current = liberarVinhetaNoAr;
+
+	const alternarAutoTrinca = useCallback((ativo) => {
+		setAutoTrincaHabilitado(Boolean(ativo));
+		autoTrincaHabilitadoRef.current = Boolean(ativo);
+	}, []);
 
 	const dispararRecadoComIA = useCallback(
 		async (pedido, voz = "pt-BR-FranciscaNeural") => {
@@ -1269,5 +1308,8 @@ export const useLocutorMesa = () => {
 		agendarFaixaAcervo,
 		dispararRecadoComIA,
 		gerandoVozIaChave,
+		blocoTrinca,
+		autoTrincaHabilitado,
+		alternarAutoTrinca,
 	};
 };

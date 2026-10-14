@@ -51,6 +51,7 @@ export const useRadioPlayer = () => {
 	const emTransicaoSuaveRef = useRef(false);
 	const sincronizandoRef = useRef(false);
 	const wakeLockRef = useRef(null);
+	const ultimoAnuncioTrincaOuvinteRef = useRef("");
 
 	const estadoMesaRef = useRef({
 		ao_vivo: false,
@@ -298,6 +299,49 @@ export const useRadioPlayer = () => {
 		[aplicarVolumesMesa],
 	);
 
+	const tocarAnuncioTrincaOuvinte = useCallback(
+		(caminho) => {
+			const url = resolveRadioAssetUrl(caminho);
+			const playerVinheta = playerVinhetaRef.current;
+			const playerMusica = playerRef.current;
+			if (!playerVinheta || !url) return;
+
+			vinhetaEmExecucaoRef.current = true;
+			if (playerMusica && !playerMusica.paused) {
+				playerMusica.pause();
+			}
+			aplicarVolumesMesa();
+
+			playerVinheta.src = url;
+			try {
+				playerVinheta.volume = Math.max(
+					0,
+					Math.min(1, volumeMasterRef.current),
+				);
+			} catch {
+				// ignore
+			}
+
+			const finalizar = () => {
+				vinhetaEmExecucaoRef.current = false;
+				aplicarVolumesMesa();
+				if (
+					estaTocandoRef.current &&
+					playerMusica &&
+					playerMusica.paused &&
+					playerMusica.src
+				) {
+					playerMusica.play().catch(() => {});
+				}
+			};
+
+			playerVinheta.onended = finalizar;
+			playerVinheta.onerror = finalizar;
+			playerVinheta.play().catch(finalizar);
+		},
+		[aplicarVolumesMesa],
+	);
+
 	const sincronizarRadio = useCallback(
 		async (forcarProxima = false, { recarregarAudio = false } = {}) => {
 			if (
@@ -456,6 +500,20 @@ export const useRadioPlayer = () => {
 					tocarHoraCerta(data.hora_certa.arquivo, data.hora_certa.horario);
 				}
 
+				if (
+					data.bloco_trinca?.anuncio_pendente &&
+					data.bloco_trinca.anuncio_pendente !== ultimoAnuncioTrincaOuvinteRef.current
+				) {
+					if (
+						!estadoMesaRef.current?.ao_vivo &&
+						estaTocandoRef.current &&
+						!vinhetaEmExecucaoRef.current
+					) {
+						ultimoAnuncioTrincaOuvinteRef.current = data.bloco_trinca.anuncio_pendente;
+						tocarAnuncioTrincaOuvinte(data.bloco_trinca.anuncio_pendente);
+					}
+				}
+
 				return data;
 			} catch {
 				setStatusTexto("Erro ao sincronizar rádio");
@@ -464,7 +522,7 @@ export const useRadioPlayer = () => {
 				sincronizandoRef.current = false;
 			}
 		},
-		[aplicarVolumesMesa, tocarHoraCerta],
+		[aplicarVolumesMesa, tocarHoraCerta, tocarAnuncioTrincaOuvinte],
 	);
 
 	const executarCrossfadeOuvinte = useCallback(async () => {
