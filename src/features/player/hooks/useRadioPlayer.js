@@ -123,7 +123,16 @@ export const useRadioPlayer = () => {
 		const playerHora = playerHoraRef.current;
 		if (playerHora) {
 			try {
-				playerHora.volume = volMaster;
+				playerHora.volume = volumeFinalMusica;
+			} catch {
+				// Ignora erro em dispositivos com volume fixo
+			}
+		}
+
+		const playerVinheta = playerVinhetaRef.current;
+		if (playerVinheta) {
+			try {
+				playerVinheta.volume = volumeFinalMusica;
 			} catch {
 				// Ignora erro em dispositivos com volume fixo
 			}
@@ -285,9 +294,19 @@ export const useRadioPlayer = () => {
 				}
 			}
 
+			const volMusicaMesa =
+				estadoMesaRef.current &&
+				typeof estadoMesaRef.current.musica_volume === "number"
+					? Math.max(0, Math.min(1, estadoMesaRef.current.musica_volume))
+					: 1.0;
+			const volumeFinalHora = Math.max(
+				0,
+				Math.min(1, volumeMasterRef.current * volMusicaMesa),
+			);
+
 			playerHora.src = resolveRadioAssetUrl(arquivo);
 			try {
-				playerHora.volume = volumeMasterRef.current;
+				playerHora.volume = volumeFinalHora;
 			} catch {
 				// ignore
 			}
@@ -311,17 +330,8 @@ export const useRadioPlayer = () => {
 			if (playerMusica && !playerMusica.paused) {
 				playerMusica.pause();
 			}
-			aplicarVolumesMesa();
-
 			playerVinheta.src = url;
-			try {
-				playerVinheta.volume = Math.max(
-					0,
-					Math.min(1, volumeMasterRef.current),
-				);
-			} catch {
-				// ignore
-			}
+			aplicarVolumesMesa();
 
 			const finalizar = () => {
 				vinhetaEmExecucaoRef.current = false;
@@ -854,17 +864,8 @@ export const useRadioPlayer = () => {
 						if (playerMusica && !playerMusica.paused) {
 							playerMusica.pause();
 						}
-						aplicarVolumesMesa();
-
 						playerVinheta.src = urlVinheta;
-						try {
-							playerVinheta.volume = Math.max(
-								0,
-								Math.min(1, volumeMasterRef.current),
-							);
-						} catch {
-							// ignore
-						}
+						aplicarVolumesMesa();
 
 						const restaurarMusicaOuvinte = () => {
 							vinhetaEmExecucaoRef.current = false;
