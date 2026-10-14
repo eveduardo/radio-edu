@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+	cancelarTrincaIa,
 	discardNextTrack,
 	fetchGenresCatalog,
 	fetchListenerRequests,
@@ -486,6 +487,12 @@ export const useLocutorMesa = () => {
 						contagem: data.bloco_trinca.contagem || 0,
 						total: data.bloco_trinca.total || 3,
 						historico: data.bloco_trinca.historico || [],
+						anuncio_pendente: data.bloco_trinca.anuncio_pendente || null,
+						texto_anuncio: data.bloco_trinca.texto_anuncio || null,
+						faixas:
+							data.bloco_trinca.faixas ||
+							data.bloco_trinca.historico ||
+							[],
 					});
 
 					if (
@@ -1025,6 +1032,17 @@ export const useLocutorMesa = () => {
 		autoTrincaHabilitadoRef.current = Boolean(ativo);
 	}, []);
 
+	const cancelarIaTrinca = useCallback(async () => {
+		try {
+			await cancelarTrincaIa();
+			ultimoAnuncioTrincaRef.current = "cancelado_" + Date.now();
+			setBlocoTrinca((prev) => ({ ...prev, anuncio_pendente: null }));
+			return true;
+		} catch {
+			return false;
+		}
+	}, []);
+
 	const dispararRecadoComIA = useCallback(
 		async (pedido, voz = "pt-BR-FranciscaNeural") => {
 			if (!pedido || !pedido.recado || !pedido.recado.trim()) {
@@ -1325,5 +1343,6 @@ export const useLocutorMesa = () => {
 		blocoTrinca,
 		autoTrincaHabilitado,
 		alternarAutoTrinca,
+		cancelarIaTrinca,
 	};
 };

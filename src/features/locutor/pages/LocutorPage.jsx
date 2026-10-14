@@ -59,8 +59,11 @@ const LocutorPage = () => {
 		blocoTrinca,
 		autoTrincaHabilitado,
 		alternarAutoTrinca,
+		cancelarIaTrinca,
 	} = useLocutorMesa();
 
+	const [modalTrincaAberto, setModalTrincaAberto] = useState(false);
+	const [textoTrincaCopiado, setTextoTrincaCopiado] = useState(false);
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
 	const [buscaMusicaModal, setBuscaMusicaModal] = useState("");
 	const [vinhetaCategoriaAtiva, setVinhetaCategoriaAtiva] = useState(null);
@@ -362,15 +365,25 @@ const LocutorPage = () => {
 					</div>
 					<div className={styles.linhaBlocoTrinca}>
 						<span className={styles.textoBlocoTrinca}>
-							📻 Bloco de Músicas:{" "}
+							<button
+								type="button"
+								className={styles.btnLinkTrinca}
+								onClick={() => setModalTrincaAberto(true)}
+								title="Clique para ver o roteiro e ler no microfone"
+							>
+								📻 Bloco de Músicas:
+							</button>{" "}
 							<strong
 								className={
-									blocoTrinca?.contagem === 0 && blocoTrinca?.historico?.length
+									blocoTrinca?.anuncio_pendente
 										? styles.destaqueTrincaVerde
 										: styles.destaqueTrincaAzul
 								}
+								onClick={() => setModalTrincaAberto(true)}
+								style={{ cursor: "pointer" }}
+								title="Clique para abrir o roteiro e ler no microfone"
 							>
-								{blocoTrinca?.contagem || 0} de 3 tocadas
+								{Math.min(3, (blocoTrinca?.contagem || 0) + 1)} de 3 tocadas
 							</strong>
 						</span>
 						<label className={styles.labelAutoTrinca}>
@@ -719,6 +732,119 @@ const LocutorPage = () => {
 						</div>
 					</div>
 				)}
+			</Modal>
+
+			{/* MODAL DE CONTEÚDO DO BLOCO / ROTEIRO DE LOCUÇÃO (TRINCA) */}
+			<Modal
+				isOpen={modalTrincaAberto}
+				onClose={() => setModalTrincaAberto(false)}
+				title="📻 Roteiro de Locução — Bloco de 3 Músicas"
+				size="md"
+				closeLabel="Fechar roteiro"
+				footer={
+					<div className={styles.modalTrincaFooter}>
+						<Button
+							variant="primary"
+							className={styles.btnAcaoLerMic}
+							onClick={async () => {
+								await cancelarIaTrinca();
+								if (!aoVivo) {
+									alternarMicrofone();
+								}
+								setModalTrincaAberto(false);
+							}}
+						>
+							🎙️ Vou ler no Microfone (Cancelar Voz IA)
+						</Button>
+						<Button
+							variant="secondary"
+							onClick={() => setModalTrincaAberto(false)}
+						>
+							Fechar
+						</Button>
+					</div>
+				}
+			>
+				<div className={styles.modalTrincaBody}>
+					<div className={styles.modalTrincaStatusBar}>
+						<span
+							className={
+								blocoTrinca?.anuncio_pendente
+									? styles.badgeTrincaVerde
+									: styles.badgeTrincaAzul
+							}
+						>
+							{blocoTrinca?.anuncio_pendente
+								? "● Bloco Completo (Anúncio Pronto)"
+								: `● Bloco em andamento: ${Math.min(3, (blocoTrinca?.contagem || 0) + 1)} de 3 tocadas`}
+						</span>
+						<span className={styles.badgeTrincaModo}>
+							{autoTrincaHabilitado
+								? "Modo: Locução IA Automática"
+								: "Modo: Locução Manual (Microfone)"}
+						</span>
+					</div>
+
+					<div className={styles.blocoInfoFaixas}>
+						<div className={styles.tituloSessaoPequena}>
+							🎵 Músicas deste bloco:
+						</div>
+						<div className={styles.listaFaixasTrinca}>
+							{(blocoTrinca?.faixas?.length
+								? blocoTrinca.faixas
+								: musicaAtual
+									? [musicaAtual]
+									: []
+							).map((f, idx) => {
+								const rawCnt = blocoTrinca?.contagem || 0;
+								const statusTxt =
+									idx < rawCnt
+										? "✓ Tocou"
+										: idx === rawCnt
+											? "▶ No ar agora"
+											: "⏳ A seguir";
+								const corClasse =
+									idx < rawCnt
+										? styles.statusFaixaPassada
+										: idx === rawCnt
+											? styles.statusFaixaNoAr
+											: styles.statusFaixaFutura;
+								return (
+									<div key={idx} className={styles.itemFaixaTrincaLinha}>
+										<span className={styles.itemFaixaNome}>
+											{idx + 1}. {f}
+										</span>
+										<span className={corClasse}>{statusTxt}</span>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+
+					<div className={styles.blocoTextoLocucao}>
+						<div className={styles.headerTextoLocucao}>
+							<span>🎙️ Texto do Arquivo Temporário (Para ler no Microfone):</span>
+							<button
+								type="button"
+								className={styles.btnCopiarTrinca}
+								onClick={() => {
+									const txt =
+										blocoTrinca?.texto_anuncio ||
+										"Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!... Fique ligado que tem muito mais som pra você!";
+									navigator.clipboard?.writeText(txt);
+									setTextoTrincaCopiado(true);
+									setTimeout(() => setTextoTrincaCopiado(false), 2000);
+								}}
+							>
+								{textoTrincaCopiado ? "✅ Copiado!" : "📋 Copiar"}
+							</button>
+						</div>
+						<div className={styles.caixaTeleprompter}>
+							{blocoTrinca?.texto_anuncio ||
+								"Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!... Fique ligado que tem muito mais som pra você!"}
+						</div>
+					</div>
+				</div>
 			</Modal>
 
 			{/* MODAL DE VINHETAS / JINGOS / PREFIXO POR SUBPASTA */}

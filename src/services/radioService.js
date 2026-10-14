@@ -56,6 +56,20 @@ export const limparTempVinheta = async (arquivo) => {
 };
 
 /**
+ * Cancela o áudio temporário da locução IA da trinca (`radio_sync.php?cancelar_trinca_ia=1`).
+ */
+export const cancelarTrincaIa = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: {
+			cancelar_trinca_ia: 1,
+			limpar_temp_vinheta: "vinhetas/temp_trinca.mp3",
+			t: Date.now(),
+		},
+	});
+	return data;
+};
+
+/**
  * Lista o acervo indexado agrupado por gênero (`radio_sync.php?listar_generos=1`).
  *
  * @returns {Promise<Record<string, Array<{id: string, arquivo: string, nome: string, genero: string, url: string, duracao: number}>>>}

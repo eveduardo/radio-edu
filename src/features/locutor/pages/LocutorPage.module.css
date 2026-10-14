@@ -1068,3 +1068,181 @@
 	font-weight: 600;
 }
 
+.btnLinkTrinca {
+	background: none;
+	border: none;
+	padding: 0;
+	color: #38bdf8;
+	font-size: 11px;
+	font-weight: 700;
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	transition: color 0.15s ease;
+}
+
+.btnLinkTrinca:hover {
+	color: #7dd3fc;
+}
+
+.modalTrincaBody {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 4px 0;
+}
+
+.modalTrincaStatusBar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	background: rgba(15, 23, 42, 0.6);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	padding: 7px 10px;
+	border-radius: 8px;
+	font-size: 11px;
+}
+
+.badgeTrincaVerde {
+	font-weight: 700;
+	padding: 3px 8px;
+	border-radius: 5px;
+	background: rgba(16, 185, 129, 0.2);
+	color: #10b981;
+}
+
+.badgeTrincaAzul {
+	font-weight: 700;
+	padding: 3px 8px;
+	border-radius: 5px;
+	background: rgba(56, 189, 248, 0.15);
+	color: #38bdf8;
+}
+
+.badgeTrincaModo {
+	font-weight: 600;
+	color: #cbd5e1;
+	font-size: 11px;
+}
+
+.blocoInfoFaixas {
+	background: rgba(15, 23, 42, 0.5);
+	border: 1px solid rgba(56, 189, 248, 0.15);
+	border-radius: 8px;
+	padding: 8px 10px;
+}
+
+.tituloSessaoPequena {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: #94a3b8;
+	font-weight: 700;
+	margin-bottom: 6px;
+}
+
+.listaFaixasTrinca {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.itemFaixaTrincaLinha {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 5px 8px;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.itemFaixaNome {
+	font-weight: 600;
+	color: #f1f5f9;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 75%;
+}
+
+.statusFaixaPassada {
+	font-size: 10px;
+	font-weight: 700;
+	color: #64748b;
+}
+
+.statusFaixaNoAr {
+	font-size: 10px;
+	font-weight: 700;
+	color: #10b981;
+}
+
+.statusFaixaFutura {
+	font-size: 10px;
+	font-weight: 700;
+	color: #38bdf8;
+}
+
+.blocoTextoLocucao {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.headerTextoLocucao {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 11px;
+	font-weight: 700;
+	color: #f1f5f9;
+}
+
+.btnCopiarTrinca {
+	background: rgba(56, 189, 248, 0.15);
+	border: 1px solid rgba(56, 189, 248, 0.3);
+	color: #38bdf8;
+	font-size: 11px;
+	font-weight: 700;
+	padding: 3px 8px;
+	border-radius: 5px;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.btnCopiarTrinca:hover {
+	background: rgba(56, 189, 248, 0.3);
+}
+
+.caixaTeleprompter {
+	background: #090d14;
+	border: 1px solid rgba(56, 189, 248, 0.35);
+	border-radius: 8px;
+	padding: 12px;
+	color: #f8fafc;
+	font-size: 13.5px;
+	line-height: 1.6;
+	font-weight: 500;
+	white-space: pre-wrap;
+	word-break: break-word;
+	user-select: text;
+	box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.modalTrincaFooter {
+	display: flex;
+	gap: 10px;
+	width: 100%;
+	justify-content: flex-end;
+}
+
+.btnAcaoLerMic {
+	background: linear-gradient(135deg, #0284c7, #0369a1);
+	color: #fff;
+	font-weight: 700;
+}
+
