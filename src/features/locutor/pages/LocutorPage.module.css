@@ -29,23 +29,58 @@
 	align-items: center;
 	padding-bottom: 6px;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	gap: 10px;
 }
 
 .titulo {
-	font-size: 16px;
+	font-size: 15px;
 	font-weight: 800;
-	letter-spacing: 0.6px;
+	letter-spacing: 0.5px;
 	color: #ffb703;
 	margin: 0;
 	display: flex;
 	align-items: center;
 	gap: 6px;
+	white-space: nowrap;
+}
+
+.relogioMesa {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	background: rgba(15, 23, 42, 0.9);
+	border: 1px solid rgba(56, 189, 248, 0.35);
+	padding: 3px 10px;
+	border-radius: 6px;
+	box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+}
+
+.relogioTexto {
+	font-family: "JetBrains Mono", "Courier New", monospace;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	color: #38bdf8;
+}
+
+.relogioPonto {
+	color: #ef4444;
+	font-size: 8px;
+	animation: piscarRelogio 1s step-start infinite;
+}
+
+@keyframes piscarRelogio {
+	50% {
+		opacity: 0;
+	}
 }
 
 .statusBadge {
 	font-size: 10px;
 	font-weight: 700;
 	letter-spacing: 0.5px;
+	white-space: nowrap;
 }
 
 .noAr {

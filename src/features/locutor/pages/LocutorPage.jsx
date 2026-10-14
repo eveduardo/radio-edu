@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { Badge, Button, Input, Modal } from "@jposawa/ronin-ui";
 import { VerticalVuMeter } from "../components/VerticalVuMeter";
@@ -61,6 +61,26 @@ const LocutorPage = () => {
 	const [vinhetaCategoriaAtiva, setVinhetaCategoriaAtiva] = useState(null);
 	const [buscaVinhetaModal, setBuscaVinhetaModal] = useState("");
 	const [pedidoLeituraAtivo, setPedidoLeituraAtivo] = useState(null);
+	const [relogioAoVivo, setRelogioAoVivo] = useState(() =>
+		new Date().toLocaleTimeString("pt-BR", {
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+		}),
+	);
+
+	useEffect(() => {
+		const timer = setInterval(() => {
+			setRelogioAoVivo(
+				new Date().toLocaleTimeString("pt-BR", {
+					hour: "2-digit",
+					minute: "2-digit",
+					second: "2-digit",
+				}),
+			);
+		}, 1000);
+		return () => clearInterval(timer);
+	}, []);
 
 	const faixasDoGeneroFiltradas = useMemo(() => {
 		if (!generoModalAtivo) return [];
@@ -83,6 +103,10 @@ const LocutorPage = () => {
 			<div className={styles.containerMesa}>
 				<div className={styles.topoMesa}>
 					<h1 className={styles.titulo}>🎙️ MESA MASTER</h1>
+					<div className={styles.relogioMesa} title="Horário de Brasília em tempo real">
+						<span className={styles.relogioPonto}>●</span>
+						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
+					</div>
 					<Badge
 						intent={aoVivo ? "danger" : "neutral"}
 						variant="filled"

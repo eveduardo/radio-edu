@@ -227,22 +227,6 @@ export const useLocutorMesa = () => {
 		[aplicarVolumeVinhetaPreview],
 	);
 
-	// Redireciona automaticamente no PC de IP de rede (ex.: http://192.168.x.x:5173/locutor)
-	// para http://localhost:5173/locutor, pois o Chrome exige localhost/HTTPS para liberar o microfone
-	useEffect(() => {
-		const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-		if (
-			!isMobile &&
-			!window.isSecureContext &&
-			window.location.hostname !== "localhost" &&
-			window.location.hostname !== "127.0.0.1"
-		) {
-			const portPart = window.location.port ? `:${window.location.port}` : "";
-			window.location.replace(
-				`http://localhost${portPart}${window.location.pathname}${window.location.search}`,
-			);
-		}
-	}, []);
 
 	const liberarRecursosMic = useCallback(() => {
 		if (streamMicRef.current) {
@@ -394,13 +378,15 @@ export const useLocutorMesa = () => {
 
 	const alternarMicrofone = useCallback(async () => {
 		if (!aoVivoRef.current) {
-			if (
-				!window.isSecureContext &&
-				window.location.hostname !== "localhost" &&
-				window.location.hostname !== "127.0.0.1"
-			) {
-				const portPart = window.location.port ? `:${window.location.port}` : "";
-				window.location.href = `http://localhost${portPart}${window.location.pathname}${window.location.search}`;
+			if (!navigator.mediaDevices?.getUserMedia) {
+				setAvisoModal({
+					icone: "🔒",
+					titulo: "Conexão Segura Necessária (HTTPS)",
+					mensagem:
+						"O microfone no navegador exige uma Conexão Segura (HTTPS) ou acesso local por 'localhost'.\n\n" +
+						"• Se estiver no Computador: acesse diretamente por http://localhost:5173/locutor.\n" +
+						"• Se estiver no Celular via IP: ative a flag chrome://flags/#unsafely-treat-insecure-origin-as-secure no Chrome adicionando a URL da rádio, ou configure HTTPS.",
+				});
 				return;
 			}
 

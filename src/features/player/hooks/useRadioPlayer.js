@@ -665,12 +665,9 @@ export const useRadioPlayer = () => {
 			"keydown",
 			"pointermove",
 			"mousemove",
-			"mouseenter",
 			"wheel",
 			"scroll",
 			"focus",
-			"pageshow",
-			"visibilitychange",
 		];
 
 		eventos.forEach((evt) =>
@@ -684,47 +681,6 @@ export const useRadioPlayer = () => {
 			eventos.forEach((evt) =>
 				window.removeEventListener(evt, desbloquear, { capture: true }),
 			);
-		};
-	}, [aplicarVolumesMesa, inicializarAudioContext]);
-
-	// Tentativa imediata de autoplay e retomada de AudioContext no mount e no foco
-	useEffect(() => {
-		inicializarAudioContext();
-
-		const tentarTocar = () => {
-			inicializarAudioContext();
-			const player = playerRef.current;
-			if (player && estaTocandoRef.current) {
-				player.muted = false;
-				aplicarVolumesMesa();
-				if (
-					player.src &&
-					player.src !== window.location.href &&
-					estadoMesaRef.current?.musica_tocando !== false
-				) {
-					player.play().catch(() => {});
-				}
-			}
-			if (audioCtxRef.current?.state === "suspended") {
-				audioCtxRef.current.resume().catch(() => {});
-			}
-		};
-
-		tentarTocar();
-		window.addEventListener("load", tentarTocar, { once: true });
-		window.addEventListener("pageshow", tentarTocar);
-		window.addEventListener("focus", tentarTocar);
-
-		const handleVisibility = () => {
-			if (document.visibilityState === "visible") tentarTocar();
-		};
-		document.addEventListener("visibilitychange", handleVisibility);
-
-		return () => {
-			window.removeEventListener("load", tentarTocar);
-			window.removeEventListener("pageshow", tentarTocar);
-			window.removeEventListener("focus", tentarTocar);
-			document.removeEventListener("visibilitychange", handleVisibility);
 		};
 	}, [aplicarVolumesMesa, inicializarAudioContext]);
 
