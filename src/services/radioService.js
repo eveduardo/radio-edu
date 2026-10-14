@@ -21,11 +21,34 @@ export const fetchRadioSync = async ({ forcarProxima = false } = {}) => {
  * Pausa ou retoma a música que está no ar no servidor (`radio_sync.php?acao_musica=pausar|retomar`).
  *
  * @param {boolean} pausar `true` para pausar, `false` para retomar
+ * @param {Object} [options]
+ * @param {string} [options.excluirTemp] Caminho do arquivo temporário a excluir
  */
-export const setRadioMusicPaused = async (pausar) => {
+export const setRadioMusicPaused = async (
+	pausar,
+	{ excluirTemp = null } = {},
+) => {
+	const params = {
+		acao_musica: pausar ? "pausar" : "retomar",
+		t: Date.now(),
+	};
+	if (excluirTemp) {
+		params.excluir_temp = excluirTemp;
+	}
+	const { data } = await api.get("/radio_sync.php", { params });
+	return data;
+};
+
+/**
+ * Remove um arquivo temporário de áudio (trinca ou recado) após ir pro ar (`radio_sync.php?limpar_temp_vinheta=...`).
+ *
+ * @param {string} arquivo
+ */
+export const limparTempVinheta = async (arquivo) => {
+	if (!arquivo) return null;
 	const { data } = await api.get("/radio_sync.php", {
 		params: {
-			acao_musica: pausar ? "pausar" : "retomar",
+			limpar_temp_vinheta: arquivo,
 			t: Date.now(),
 		},
 	});

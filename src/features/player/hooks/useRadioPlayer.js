@@ -4,6 +4,7 @@ import { volumeAtom } from "@/globalState";
 import {
 	fetchRadioSync,
 	fetchVoiceChunkBlob,
+	limparTempVinheta,
 	resolveRadioAssetUrl,
 	subscribeToMesa,
 } from "@/services";
@@ -332,6 +333,9 @@ export const useRadioPlayer = () => {
 					playerMusica.src
 				) {
 					playerMusica.play().catch(() => {});
+				}
+				if (caminho && caminho.includes("temp_")) {
+					limparTempVinheta(caminho).catch(() => {});
 				}
 			};
 

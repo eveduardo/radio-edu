@@ -499,6 +499,7 @@ export const useLocutorMesa = () => {
 								nome: "Trinca Flash (Locução)",
 								arquivo: data.bloco_trinca.anuncio_pendente,
 								url: data.bloco_trinca.anuncio_pendente,
+								excluirAposTocar: true,
 							});
 						}
 					}
@@ -916,7 +917,11 @@ export const useLocutorMesa = () => {
 					audio.play().catch(() => {});
 				}
 
-				setRadioMusicPaused(false).catch(() => {});
+				const arqTemp =
+					alvo?.excluirAposTocar || alvo?.arquivo?.includes("temp_")
+						? alvo.arquivo
+						: null;
+				setRadioMusicPaused(false, { excluirTemp: arqTemp }).catch(() => {});
 
 				updateMesa({
 					ao_vivo: aoVivoRef.current,
@@ -1040,8 +1045,16 @@ export const useLocutorMesa = () => {
 					voz,
 				});
 
-				if (!dados.sucesso || !dados.arquivo) {
-					throw new Error(dados.erro || "Falha ao sintetizar voz do recado.");
+				// Marca o pedido como TOCADO no pedidos.txt para permanecer na lista com opção de excluir
+				if (pedido.chave_linha) {
+					markRequestAsPlayed(pedido.chave_linha).catch(() => {});
+					setPedidos((prev) =>
+						prev.map((item) =>
+							item.chave_linha === pedido.chave_linha
+								? { ...item, tocado: true }
+								: item,
+						),
+					);
 				}
 
 				await liberarVinhetaNoAr({
@@ -1049,6 +1062,7 @@ export const useLocutorMesa = () => {
 					nome: `Recado: ${pedido.nome}`,
 					arquivo: dados.arquivo,
 					url: dados.url || dados.arquivo,
+					excluirAposTocar: true,
 				});
 			} catch (err) {
 				setAvisoModal({
