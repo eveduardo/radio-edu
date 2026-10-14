@@ -137,6 +137,7 @@ export const useLocutorMesa = () => {
 	const urlFaixaNoArRef = useRef("");
 	const proximaNomeServidorRef = useRef("");
 	const temAgendamentoExplicitoRef = useRef(false);
+	const musicaPausadaPorVinhetaRef = useRef(false);
 
 	const streamMicRef = useRef(null);
 	const micAudioCtxRef = useRef(null);
@@ -798,62 +799,6 @@ export const useLocutorMesa = () => {
 		}
 	}, [ouvirVinhetaNoCanal, pararEscutaVinheta]);
 
-	const duckarVolumeMusica = useCallback(async () => {
-		const volAtual = faderMusicaRef.current;
-		if (faderMusicaAnteriorRef.current === null) {
-			faderMusicaAnteriorRef.current = volAtual > 0.2 ? volAtual : 1.0;
-		}
-		if (volAtual <= 0.2) return;
-
-		const volAlvo = 0.2;
-		const passos = 4;
-		const diff = (volAtual - volAlvo) / passos;
-
-		for (let i = 1; i <= passos; i++) {
-			await new Promise((r) => setTimeout(r, 25));
-			const v = Number(Math.max(volAlvo, volAtual - diff * i).toFixed(2));
-			faderMusicaRef.current = v;
-			setFaderMusica(v);
-			aplicarVolumeMonitor(v);
-		}
-		faderMusicaRef.current = volAlvo;
-		setFaderMusica(volAlvo);
-		aplicarVolumeMonitor(volAlvo);
-		sincronizarMesaFirebase(true);
-	}, [aplicarVolumeMonitor, sincronizarMesaFirebase]);
-
-	const restaurarVolumeMusica = useCallback(async () => {
-		const volAlvo =
-			faderMusicaAnteriorRef.current !== null
-				? faderMusicaAnteriorRef.current
-				: 1.0;
-		faderMusicaAnteriorRef.current = null;
-		const volAtual = faderMusicaRef.current;
-
-		const passos = 5;
-		const diff = (volAlvo - volAtual) / passos;
-
-		for (let i = 1; i <= passos; i++) {
-			await new Promise((r) => setTimeout(r, 40));
-			const v = Number(Math.min(volAlvo, volAtual + diff * i).toFixed(2));
-			faderMusicaRef.current = v;
-			setFaderMusica(v);
-			aplicarVolumeMonitor(v);
-		}
-		faderMusicaRef.current = volAlvo;
-		setFaderMusica(volAlvo);
-		aplicarVolumeMonitor(volAlvo);
-
-		// Notifica o Firebase com o volume restaurado e finaliza a vinheta no ar
-		updateMesa({
-			ao_vivo: aoVivoRef.current,
-			mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
-			musica_tocando: !musicaPausadaRef.current,
-			musica_volume: volAlvo,
-			vinheta_ativa: { acao: "parar", timestamp: Date.now() },
-		}).catch(() => {});
-	}, [aplicarVolumeMonitor]);
-
 	const iniciarCronometroVinhetaNoAr = useCallback((alvo, urlVinheta) => {
 		if (vinhetaTimerIntervalRef.current) {
 			clearInterval(vinhetaTimerIntervalRef.current);
@@ -919,10 +864,36 @@ export const useLocutorMesa = () => {
 				setTempoRestanteVinhetaSeg(0);
 				vinhetaSelecionadaRef.current = null;
 				setVinhetaSelecionada(null);
-				restaurarVolumeMusica();
+
+				// Ao término da vinheta/prefixo, dá o play novamente na música
+				if (musicaPausadaPorVinhetaRef.current) {
+					musicaPausadaPorVinhetaRef.current = false;
+					musicaPausadaRef.current = false;
+					setMusicaPausada(false);
+
+					const audio = monitorAudioRef.current;
+					if (audio && ouvindoProgramacaoRef.current && audio.src) {
+						aplicarVolumeMonitor(faderMusicaRef.current);
+						audio.play().catch(() => {});
+					}
+
+					setRadioMusicPaused(false).catch(() => {});
+
+					updateMesa({
+						ao_vivo: aoVivoRef.current,
+						mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
+						musica_tocando: true,
+						musica_volume: faderMusicaRef.current,
+						vinheta_ativa: { acao: "parar", timestamp: Date.now() },
+					}).catch(() => {});
+				} else {
+					updateMesa({
+						vinheta_ativa: { acao: "parar", timestamp: Date.now() },
+					}).catch(() => {});
+				}
 			}
 		}, 250);
-	}, [restaurarVolumeMusica]);
+	}, [aplicarVolumeMonitor]);
 
 	useEffect(() => {
 		return () => {
@@ -966,8 +937,28 @@ export const useLocutorMesa = () => {
 
 			const urlVinheta = resolveRadioAssetUrl(alvo.url || alvo.arquivo || "");
 
+			// Pausa total da música no ar durante a vinheta (sem mexer no fader)
+			if (!musicaPausadaRef.current) {
+				musicaPausadaPorVinhetaRef.current = true;
+				musicaPausadaRef.current = true;
+				setMusicaPausada(true);
+
+				const audio = monitorAudioRef.current;
+				if (audio) {
+					audio.pause();
+				}
+
+				setRadioMusicPaused(true).catch(() => {});
+			} else {
+				musicaPausadaPorVinhetaRef.current = false;
+			}
+
 			try {
 				await updateMesa({
+					ao_vivo: aoVivoRef.current,
+					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
+					musica_tocando: false, // PAUSA TOTAL DA MÚSICA NO AR
+					musica_volume: faderMusicaRef.current,
 					vinheta_ativa: {
 						arquivo: alvo.arquivo,
 						url: alvo.url || alvo.arquivo,
@@ -976,9 +967,6 @@ export const useLocutorMesa = () => {
 						timestamp: Date.now(),
 					},
 				});
-
-				// Baixa o volume da música suavemente durante a vinheta
-				duckarVolumeMusica();
 
 				iniciarCronometroVinhetaNoAr(alvo, urlVinheta);
 			} catch {
@@ -989,7 +977,7 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[duckarVolumeMusica, iniciarCronometroVinhetaNoAr],
+		[iniciarCronometroVinhetaNoAr],
 	);
 
 	const atualizarAcervo = useCallback(async () => {

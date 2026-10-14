@@ -53,7 +53,6 @@ const LocutorPage = () => {
 		atualizarAcervo,
 		atenderPedido,
 		solicitarDescartePedido,
-		descartarProximaFaixa,
 		agendarFaixaAcervo,
 	} = useLocutorMesa();
 
@@ -353,18 +352,8 @@ const LocutorPage = () => {
 					<div className={styles.nomeMusicaAr} title={musicaAtual}>
 						{musicaAtual}
 					</div>
-					<div className={styles.linhaProximaMusica}>
-						<div className={styles.proximaProgramadaLbl} title={proximaAtual}>
-							{proximaAtual}
-						</div>
-						<button
-							type="button"
-							className={styles.btnDescartarProxima}
-							onClick={descartarProximaFaixa}
-							title="Descartar ou trocar a música a seguir imediatamente (sorteia outra)"
-						>
-							✕ Trocar
-						</button>
+					<div className={styles.proximaProgramadaLbl} title={proximaAtual}>
+						{proximaAtual}
 					</div>
 				</div>
 

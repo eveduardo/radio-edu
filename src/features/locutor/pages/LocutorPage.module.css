@@ -449,42 +449,12 @@
 	text-overflow: ellipsis;
 }
 
-.linhaProximaMusica {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 6px;
-	min-width: 0;
-}
-
 .proximaProgramadaLbl {
-	flex: 1;
-	min-width: 0;
 	font-size: 10px;
 	color: #94a3b8;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.btnDescartarProxima {
-	flex-shrink: 0;
-	background: rgba(239, 68, 68, 0.15);
-	border: 1px solid rgba(239, 68, 68, 0.4);
-	color: #fca5a5;
-	font-size: 9.5px;
-	font-weight: 700;
-	padding: 1px 6px;
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.15s ease;
-	line-height: 1.3;
-}
-
-.btnDescartarProxima:hover:not(:disabled) {
-	background: #ef4444;
-	color: #fff;
-	border-color: #ef4444;
 }
 
 .painelPedidos {

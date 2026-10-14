@@ -74,11 +74,10 @@ export const useRadioPlayer = () => {
 				? Math.max(0, Math.min(1, estadoMesa.mic_volume))
 				: 1.0;
 
-		const duckVinheta = vinhetaEmExecucaoRef.current ? 0.2 : 1.0;
 		// CH-1 (Mic) e CH-2 (Música) seguem a mesma regra e nunca ultrapassam o volume Master do ouvinte
 		const volumeFinalMusica = Math.max(
 			0,
-			Math.min(1, volMaster * volMusicaMesa * duckVinheta),
+			Math.min(1, volMaster * volMusicaMesa),
 		);
 		const volumeFinalMic = Math.max(0, Math.min(1, volMaster * volMicMesa));
 
@@ -703,6 +702,7 @@ export const useRadioPlayer = () => {
 				player &&
 				player.paused &&
 				player.src &&
+				!vinhetaEmExecucaoRef.current &&
 				!emTransicaoSuaveRef.current
 			) {
 				player
@@ -767,10 +767,20 @@ export const useRadioPlayer = () => {
 			) {
 				ultimaVinhetaTocadaRef.current = dados.vinheta_ativa.timestamp;
 				const playerVinheta = playerVinhetaRef.current;
+				const playerMusica = playerRef.current;
 
 				if (dados.vinheta_ativa.acao === "parar") {
 					vinhetaEmExecucaoRef.current = false;
 					playerVinheta?.pause();
+					if (
+						estaTocandoRef.current &&
+						playerMusica &&
+						playerMusica.paused &&
+						playerMusica.src &&
+						dados.musica_tocando !== false
+					) {
+						playerMusica.play().catch(() => {});
+					}
 					aplicarVolumesMesa();
 				} else {
 					const caminhoVinheta =
@@ -778,6 +788,10 @@ export const useRadioPlayer = () => {
 					const urlVinheta = resolveRadioAssetUrl(caminhoVinheta);
 					if (playerVinheta && urlVinheta && estaTocandoRef.current) {
 						vinhetaEmExecucaoRef.current = true;
+						// PAUSA TOTAL DA MÚSICA AO DISPARAR VINHETA
+						if (playerMusica && !playerMusica.paused) {
+							playerMusica.pause();
+						}
 						aplicarVolumesMesa();
 
 						playerVinheta.src = urlVinheta;
@@ -793,6 +807,16 @@ export const useRadioPlayer = () => {
 						const restaurarMusicaOuvinte = () => {
 							vinhetaEmExecucaoRef.current = false;
 							aplicarVolumesMesa();
+							// DÁ O PLAY NOVAMENTE NA MÚSICA APÓS O TÉRMINO DA VINHETA
+							if (
+								estaTocandoRef.current &&
+								playerMusica &&
+								playerMusica.paused &&
+								playerMusica.src &&
+								estadoMesaRef.current?.musica_tocando !== false
+							) {
+								playerMusica.play().catch(() => {});
+							}
 						};
 
 						playerVinheta.onended = restaurarMusicaOuvinte;
