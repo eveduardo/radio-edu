@@ -229,3 +229,29 @@ export const fetchVoiceChunkBlob = async (chunkId, retries = 4) => {
 
 	return null;
 };
+
+/**
+ * Gera áudio neural do recado do ouvinte via IA (Edge-TTS Neural pt-BR).
+ *
+ * @param {Object} params
+ * @param {string} params.nome
+ * @param {string} params.recado
+ * @param {string} [params.titulo]
+ * @param {string} [params.voz='pt-BR-FranciscaNeural']
+ * @returns {Promise<{sucesso: boolean, arquivo: string, url: string, nome_vinheta: string, texto_falado: string}>}
+ */
+export const gerarVozRecadoIA = async ({
+	nome,
+	recado,
+	titulo = "",
+	voz = "pt-BR-FranciscaNeural",
+}) => {
+	const formData = new FormData();
+	formData.append("nome", nome);
+	formData.append("recado", recado);
+	formData.append("titulo", titulo);
+	formData.append("voz", voz);
+
+	const { data } = await api.post("/gerar_recado_ia.php", formData);
+	return data;
+};

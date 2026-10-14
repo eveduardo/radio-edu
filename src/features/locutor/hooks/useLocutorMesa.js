@@ -5,6 +5,7 @@ import {
 	fetchListenerRequests,
 	fetchRadioSync,
 	fetchVinhetasCatalog,
+	gerarVozRecadoIA,
 	markRequestAsPlayed,
 	rebuildRadioCache,
 	removeListenerRequest,
@@ -104,6 +105,7 @@ export const useLocutorMesa = () => {
 	const [vinhetaNoArNome, setVinhetaNoArNome] = useState("");
 	const [tempoRestanteVinhetaSeg, setTempoRestanteVinhetaSeg] = useState(0);
 	const [atualizandoAcervo, setAtualizandoAcervo] = useState(false);
+	const [gerandoVozIaChave, setGerandoVozIaChave] = useState(null);
 
 	const [avisoModal, setAvisoModal] = useState(null);
 	const [confirmacaoModal, setConfirmacaoModal] = useState(null);
@@ -845,6 +847,11 @@ export const useLocutorMesa = () => {
 				},
 				{ once: true },
 			);
+			try {
+				probe.load();
+			} catch {
+				// ignore
+			}
 		}
 
 		vinhetaTimerIntervalRef.current = setInterval(() => {
@@ -866,31 +873,25 @@ export const useLocutorMesa = () => {
 				setVinhetaSelecionada(null);
 
 				// Ao término da vinheta/prefixo, dá o play novamente na música
-				if (musicaPausadaPorVinhetaRef.current) {
-					musicaPausadaPorVinhetaRef.current = false;
-					musicaPausadaRef.current = false;
-					setMusicaPausada(false);
+				musicaPausadaPorVinhetaRef.current = false;
+				musicaPausadaRef.current = false;
+				setMusicaPausada(false);
 
-					const audio = monitorAudioRef.current;
-					if (audio && ouvindoProgramacaoRef.current && audio.src) {
-						aplicarVolumeMonitor(faderMusicaRef.current);
-						audio.play().catch(() => {});
-					}
-
-					setRadioMusicPaused(false).catch(() => {});
-
-					updateMesa({
-						ao_vivo: aoVivoRef.current,
-						mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
-						musica_tocando: true,
-						musica_volume: faderMusicaRef.current,
-						vinheta_ativa: { acao: "parar", timestamp: Date.now() },
-					}).catch(() => {});
-				} else {
-					updateMesa({
-						vinheta_ativa: { acao: "parar", timestamp: Date.now() },
-					}).catch(() => {});
+				const audio = monitorAudioRef.current;
+				if (audio && ouvindoProgramacaoRef.current && audio.src) {
+					aplicarVolumeMonitor(faderMusicaRef.current);
+					audio.play().catch(() => {});
 				}
+
+				setRadioMusicPaused(false).catch(() => {});
+
+				updateMesa({
+					ao_vivo: aoVivoRef.current,
+					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
+					musica_tocando: true,
+					musica_volume: faderMusicaRef.current,
+					vinheta_ativa: { acao: "parar", timestamp: Date.now() },
+				}).catch(() => {});
 			}
 		}, 250);
 	}, [aplicarVolumeMonitor]);
@@ -978,6 +979,51 @@ export const useLocutorMesa = () => {
 			}
 		},
 		[iniciarCronometroVinhetaNoAr],
+	);
+
+	const dispararRecadoComIA = useCallback(
+		async (pedido, voz = "pt-BR-FranciscaNeural") => {
+			if (!pedido || !pedido.recado || !pedido.recado.trim()) {
+				setAvisoModal({
+					icone: "⚠️",
+					titulo: "Sem Recado",
+					mensagem: "Este pedido não contém mensagem de texto para a IA ler.",
+				});
+				return;
+			}
+
+			setGerandoVozIaChave(pedido.chave_linha);
+			try {
+				const dados = await gerarVozRecadoIA({
+					nome: pedido.nome,
+					recado: pedido.recado,
+					titulo: pedido.titulo || "",
+					voz,
+				});
+
+				if (!dados.sucesso || !dados.arquivo) {
+					throw new Error(dados.erro || "Falha ao sintetizar voz do recado.");
+				}
+
+				await liberarVinhetaNoAr({
+					id: "recado_" + pedido.chave_linha,
+					nome: `Recado: ${pedido.nome}`,
+					arquivo: dados.arquivo,
+					url: dados.url || dados.arquivo,
+				});
+			} catch (err) {
+				setAvisoModal({
+					icone: "❌",
+					titulo: "Erro na Voz IA",
+					mensagem:
+						"Não foi possível gerar a voz neural do recado: " +
+						(err?.message || err),
+				});
+			} finally {
+				setGerandoVozIaChave(null);
+			}
+		},
+		[liberarVinhetaNoAr],
 	);
 
 	const atualizarAcervo = useCallback(async () => {
@@ -1221,5 +1267,7 @@ export const useLocutorMesa = () => {
 		solicitarDescartePedido,
 		descartarProximaFaixa,
 		agendarFaixaAcervo,
+		dispararRecadoComIA,
+		gerandoVozIaChave,
 	};
 };

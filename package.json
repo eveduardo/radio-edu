@@ -12,14 +12,19 @@
   "dependencies": {
     "@ant-design/icons": "^6.2.5",
     "@jposawa/ronin-ui": "^0.2.1",
+    "@travisvn/edge-tts": "^1.0.2",
     "axios": "^1.17.0",
     "clsx": "^2.1.1",
+    "edge-tts": "^1.0.1",
+    "edge-tts-universal": "^1.4.0",
     "firebase": "^13.0.0",
+    "msedge-tts": "^2.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.12.0",
-    "recoil": "^0.7.7"
+    "recoil": "^0.7.7",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",

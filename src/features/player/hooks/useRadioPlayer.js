@@ -693,11 +693,12 @@ export const useRadioPlayer = () => {
 			}
 
 			const player = playerRef.current;
-			if (dados.musica_tocando === false) {
+			if (dados.musica_tocando === false && !vinhetaEmExecucaoRef.current) {
 				if (player && !player.paused) {
 					player.pause();
 				}
 			} else if (
+				dados.musica_tocando === true &&
 				estaTocandoRef.current &&
 				player &&
 				player.paused &&
@@ -776,8 +777,7 @@ export const useRadioPlayer = () => {
 						estaTocandoRef.current &&
 						playerMusica &&
 						playerMusica.paused &&
-						playerMusica.src &&
-						dados.musica_tocando !== false
+						playerMusica.src
 					) {
 						playerMusica.play().catch(() => {});
 					}
@@ -812,8 +812,7 @@ export const useRadioPlayer = () => {
 								estaTocandoRef.current &&
 								playerMusica &&
 								playerMusica.paused &&
-								playerMusica.src &&
-								estadoMesaRef.current?.musica_tocando !== false
+								playerMusica.src
 							) {
 								playerMusica.play().catch(() => {});
 							}

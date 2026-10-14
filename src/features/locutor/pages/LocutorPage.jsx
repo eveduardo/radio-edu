@@ -54,6 +54,8 @@ const LocutorPage = () => {
 		atenderPedido,
 		solicitarDescartePedido,
 		agendarFaixaAcervo,
+		dispararRecadoComIA,
+		gerandoVozIaChave,
 	} = useLocutorMesa();
 
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
@@ -410,14 +412,27 @@ const LocutorPage = () => {
 											)}
 											<div className={styles.botoesAcaoPedido}>
 												{temRecado && (
-													<button
-														type="button"
-														className={styles.btnLerPedido}
-														title="Abrir recado em fonte grande para leitura no ar"
-														onClick={() => setPedidoLeituraAtivo(p)}
-													>
-														📖 Ler
-													</button>
+													<>
+														<button
+															type="button"
+															className={styles.btnIaPedido}
+															title="Gerar áudio com IA (Edge-TTS Neural) e disparar no ar como vinheta"
+															disabled={gerandoVozIaChave === p.chave_linha}
+															onClick={() => dispararRecadoComIA(p)}
+														>
+															{gerandoVozIaChave === p.chave_linha
+																? "⏳ Gerando..."
+																: "🤖 Voz IA"}
+														</button>
+														<button
+															type="button"
+															className={styles.btnLerPedido}
+															title="Abrir recado em fonte grande para leitura no ar"
+															onClick={() => setPedidoLeituraAtivo(p)}
+														>
+															📖 Ler
+														</button>
+													</>
 												)}
 												{p.tocado ? (
 													<span className={styles.badgeTocado}>✔ Já Tocou</span>
@@ -586,6 +601,24 @@ const LocutorPage = () => {
 							🗑 Excluir
 						</button>
 						<div className={styles.modalLeituraRightActions}>
+							{pedidoLeituraAtivo?.recado && (
+								<button
+									type="button"
+									className={styles.btnIaPedido}
+									disabled={
+										gerandoVozIaChave === pedidoLeituraAtivo.chave_linha
+									}
+									onClick={() => {
+										const pedidoAlvo = pedidoLeituraAtivo;
+										setPedidoLeituraAtivo(null);
+										dispararRecadoComIA(pedidoAlvo);
+									}}
+								>
+									{gerandoVozIaChave === pedidoLeituraAtivo.chave_linha
+										? "⏳ Gerando Voz IA..."
+										: "🤖 Tocar no Ar com Voz IA"}
+								</button>
+							)}
 							{pedidoLeituraAtivo && !pedidoLeituraAtivo.tocado && (
 								<>
 									<button

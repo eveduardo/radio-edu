@@ -598,6 +598,32 @@
 	background: #0369a1;
 }
 
+.btnIaPedido {
+	background: linear-gradient(135deg, #7c3aed, #4f46e5);
+	color: #fff;
+	border: 1px solid rgba(167, 139, 250, 0.4);
+	border-radius: 6px;
+	padding: 4px 8px;
+	font-size: 10px;
+	font-weight: 700;
+	cursor: pointer;
+	white-space: nowrap;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	transition: all 0.2s ease;
+}
+
+.btnIaPedido:hover:not(:disabled) {
+	background: linear-gradient(135deg, #8b5cf6, #6366f1);
+	box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+.btnIaPedido:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 .badgeTocado {
 	background: #1e293b;
 	color: #64748b;
