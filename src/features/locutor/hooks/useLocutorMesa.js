@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+	discardNextTrack,
 	fetchGenresCatalog,
 	fetchListenerRequests,
 	fetchRadioSync,
@@ -1074,6 +1075,18 @@ export const useLocutorMesa = () => {
 					try {
 						await removeListenerRequest(pedido.chave_linha);
 						carregarPedidos();
+						const tituloPedido = pedido.titulo || "";
+						const nomeOuvinte = pedido.nome || "";
+						if (
+							(tituloPedido && proximaAtual.includes(tituloPedido)) ||
+							(nomeOuvinte &&
+								nomeOuvinte !== "Anônimo" &&
+								nomeOuvinte !== "Ouvinte Anônimo" &&
+								proximaAtual.includes(nomeOuvinte))
+						) {
+							await discardNextTrack();
+						}
+						await monitorarMusicaNoAr();
 					} catch {
 						// ignore
 					} finally {
@@ -1082,8 +1095,33 @@ export const useLocutorMesa = () => {
 				},
 			});
 		},
-		[carregarPedidos],
+		[carregarPedidos, monitorarMusicaNoAr, proximaAtual],
 	);
+
+	const descartarProximaFaixa = useCallback(async () => {
+		try {
+			const res = await discardNextTrack();
+			if (res?.proxima_faixa?.nome) {
+				const novoTexto = res.proxima_faixa.nome;
+				proximaNomeServidorRef.current = novoTexto;
+				temAgendamentoExplicitoRef.current = false;
+				setProximaAtual(`A seguir: ${novoTexto}`);
+				updateMesa({ atualizacao_programacao: Date.now() }).catch(() => {});
+				setAvisoModal({
+					icone: "🔄",
+					titulo: "Próxima Faixa Alterada",
+					mensagem: `A faixa anterior foi descartada.\n\nNova música a seguir:\n"${novoTexto}"`,
+				});
+				setTimeout(monitorarMusicaNoAr, 500);
+			}
+		} catch {
+			setAvisoModal({
+				icone: "⚠️",
+				titulo: "Erro",
+				mensagem: "Não foi possível descartar a próxima faixa.",
+			});
+		}
+	}, [monitorarMusicaNoAr]);
 
 	const agendarFaixaAcervo = useCallback(
 		async (faixa, tocarAgora = false) => {
@@ -1193,6 +1231,7 @@ export const useLocutorMesa = () => {
 		atualizarAcervo,
 		atenderPedido,
 		solicitarDescartePedido,
+		descartarProximaFaixa,
 		agendarFaixaAcervo,
 	};
 };

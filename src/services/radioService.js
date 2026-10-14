@@ -98,6 +98,19 @@ export const scheduleNextTrack = async (
 };
 
 /**
+ * Descarta a faixa que está agendada a seguir e sorteia outra imediatamente (`radio_sync.php?descartar_proxima=1`).
+ */
+export const discardNextTrack = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: {
+			descartar_proxima: "1",
+			t: Date.now(),
+		},
+	});
+	return data;
+};
+
+/**
  * Envia um pedido musical do ouvinte (`POST /fazer_pedido.php`).
  *
  * @param {Object} payload
