@@ -1044,7 +1044,7 @@ export const useLocutorMesa = () => {
 	}, []);
 
 	const dispararRecadoComIA = useCallback(
-		async (pedido, voz = "pt-BR-FranciscaNeural") => {
+		async (pedido, voz = "pt-BR-ThalitaMultilingualNeural") => {
 			if (!pedido || !pedido.recado || !pedido.recado.trim()) {
 				setAvisoModal({
 					icone: "⚠️",

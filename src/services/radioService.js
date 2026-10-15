@@ -281,7 +281,7 @@ export const gerarVozRecadoIA = async ({
 	nome,
 	recado,
 	titulo = "",
-	voz = "pt-BR-FranciscaNeural",
+	voz = "pt-BR-ThalitaMultilingualNeural",
 }) => {
 	const formData = new FormData();
 	formData.append("nome", nome);
