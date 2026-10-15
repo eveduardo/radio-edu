@@ -186,6 +186,31 @@
 	transition: opacity 0.2s ease;
 }
 
+.badgePrograma {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 2px 10px;
+	background: rgba(56, 189, 248, 0.12);
+	border: 1px solid rgba(56, 189, 248, 0.25);
+	border-radius: 12px;
+	color: #e0f2fe;
+	font-size: 0.72rem;
+	font-weight: 600;
+	margin: 0 auto 3px;
+	max-width: 95%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.horarioPrograma {
+	color: #94a3b8;
+	font-weight: 400;
+	font-size: 0.68rem;
+}
+
 .tituloMusica {
 	margin: 4px 0 1px;
 	font-size: 0.95rem;

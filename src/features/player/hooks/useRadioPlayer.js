@@ -17,6 +17,8 @@ export const useRadioPlayer = () => {
 	const [proximaFaixa, setProximaFaixa] = useState("Aguardando programação");
 	const [statusTexto, setStatusTexto] = useState("Transmitindo em tempo real");
 	const [recolhido, setRecolhido] = useState(false);
+	const [programaAtual, setProgramaAtual] = useState(null);
+	const [proximoPrograma, setProximoPrograma] = useState(null);
 
 	const playerRef = useRef(null); // Deck A
 	const playerDeckBRef = useRef(null); // Deck B
@@ -433,6 +435,13 @@ export const useRadioPlayer = () => {
 				setProximaFaixa(`A seguir: ${data.proxima_faixa?.nome || "--"}`);
 				if (data.proxima_faixa?.url) {
 					proximaUrlRef.current = resolveRadioAssetUrl(data.proxima_faixa.url);
+				}
+
+				if (data.programa) {
+					setProgramaAtual(data.programa);
+				}
+				if (data.proximo_programa) {
+					setProximoPrograma(data.proximo_programa);
 				}
 
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual?.url || "");
@@ -1344,6 +1353,8 @@ export const useRadioPlayer = () => {
 		statusTexto,
 		volumeMaster,
 		recolhido,
+		programaAtual,
+		proximoPrograma,
 		playerRef,
 		playerDeckBRef,
 		playerHoraRef,

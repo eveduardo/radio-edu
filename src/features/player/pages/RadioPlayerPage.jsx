@@ -27,6 +27,7 @@ const RadioPlayerContent = () => {
 		statusTexto,
 		volumeMaster,
 		recolhido,
+		programaAtual,
 		playerRef,
 		playerDeckBRef,
 		audioCtxRef,
@@ -77,6 +78,18 @@ const RadioPlayerContent = () => {
 				</div>
 
 				<div className={styles.cardCorpoInferior}>
+					{programaAtual && (
+						<div
+							className={styles.badgePrograma}
+							title={programaAtual.slogan || programaAtual.nome}
+						>
+							<span>{programaAtual.icone || "📻"}</span>
+							<span>{programaAtual.nome}</span>
+							<span className={styles.horarioPrograma}>
+								({programaAtual.horario})
+							</span>
+						</div>
+					)}
 					<h2 className={styles.tituloMusica} title={tituloMusica}>
 						{tituloMusica}
 					</h2>
