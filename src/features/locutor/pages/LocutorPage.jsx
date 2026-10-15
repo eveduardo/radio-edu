@@ -239,10 +239,14 @@ const LocutorPage = () => {
 									ouvindoProgramacao && styles.ativoRetorno,
 								)}
 								onClick={alternarEscutaProgramacao}
-								title="Ligar / Desligar escuta da música que está no ar"
+								title={
+									ouvindoProgramacao
+										? "Desligar retorno da música na mesa/fones"
+										: "Ligar retorno da música na mesa/fones"
+								}
 							>
 								<span>{ouvindoProgramacao ? "🔊" : "🔇"}</span>
-								<span>{ouvindoProgramacao ? "LIG." : "DESL."}</span>
+								<span>{ouvindoProgramacao ? "DESL." : "LIG."}</span>
 							</button>
 						</div>
 					</div>
@@ -767,17 +771,11 @@ const LocutorPage = () => {
 			>
 				<div className={styles.modalTrincaBody}>
 					<div className={styles.modalTrincaStatusBar}>
-						<span
-							className={
-								blocoTrinca?.anuncio_pendente
-									? styles.badgeTrincaVerde
-									: styles.badgeTrincaAzul
-							}
-						>
-							{blocoTrinca?.anuncio_pendente
-								? "● Bloco Completo (Anúncio Pronto)"
-								: `● Bloco em andamento: ${Math.min(3, (blocoTrinca?.contagem || 0) + 1)} de 3 tocadas`}
-						</span>
+						{blocoTrinca?.anuncio_pendente && (
+							<span className={styles.badgeTrincaVerde}>
+								● Bloco Completo (Anúncio Pronto)
+							</span>
+						)}
 						<span className={styles.badgeTrincaModo}>
 							{autoTrincaHabilitado
 								? "Modo: Locução IA Automática"
@@ -795,29 +793,13 @@ const LocutorPage = () => {
 								: musicaAtual
 									? [musicaAtual]
 									: []
-							).map((f, idx) => {
-								const rawCnt = blocoTrinca?.contagem || 0;
-								const statusTxt =
-									idx < rawCnt
-										? "✓ Tocou"
-										: idx === rawCnt
-											? "▶ No ar agora"
-											: "⏳ A seguir";
-								const corClasse =
-									idx < rawCnt
-										? styles.statusFaixaPassada
-										: idx === rawCnt
-											? styles.statusFaixaNoAr
-											: styles.statusFaixaFutura;
-								return (
-									<div key={idx} className={styles.itemFaixaTrincaLinha}>
-										<span className={styles.itemFaixaNome}>
-											{idx + 1}. {f}
-										</span>
-										<span className={corClasse}>{statusTxt}</span>
-									</div>
-								);
-							})}
+							).map((f, idx) => (
+								<div key={idx} className={styles.itemFaixaTrincaLinha}>
+									<span className={styles.itemFaixaNome}>
+										{idx + 1}. {f}
+									</span>
+								</div>
+							))}
 						</div>
 					</div>
 

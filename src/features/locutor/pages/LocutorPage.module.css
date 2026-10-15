@@ -268,7 +268,7 @@
 	flex: 1;
 	min-width: 0;
 	padding: 6px 2px;
-	font-size: 9.5px;
+	font-size: 10px;
 	font-weight: 800;
 	border-radius: 6px;
 	border: 1px solid #334155;
@@ -286,14 +286,12 @@
 	white-space: nowrap;
 }
 
-.btnCanalVinhetaAr {
-	border-color: rgba(168, 85, 247, 0.55);
-	background: linear-gradient(180deg, #581c87 0%, #3b0764 100%);
-	color: #f3e8ff;
-}
-
+.btnCanalMic:hover:not(:disabled),
+.btnCanalVinhetaCue:hover:not(:disabled),
 .btnCanalVinhetaAr:hover:not(:disabled) {
 	filter: brightness(1.15);
+	border-color: #64748b;
+	color: #f8fafc;
 }
 
 .btnCanalVinhetaCue:disabled,
@@ -1166,7 +1164,7 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	max-width: 75%;
+	width: 100%;
 }
 
 .statusFaixaPassada {
