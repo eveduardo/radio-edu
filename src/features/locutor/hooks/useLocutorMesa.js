@@ -868,7 +868,57 @@ export const useLocutorMesa = () => {
 		setVinhetaNoArNome(alvo.nome || "Vinheta");
 		setTempoRestanteVinhetaSeg(duracaoSeg);
 
-		if (urlVinheta) {
+		if (alvo.prefixo) {
+			const probePrefixo = new Audio();
+			probePrefixo.preload = "metadata";
+			probePrefixo.muted = true;
+			probePrefixo.src = resolveRadioAssetUrl(alvo.prefixo);
+
+			const probeIa = new Audio();
+			probeIa.preload = "metadata";
+			probeIa.muted = true;
+			probeIa.src = urlVinheta;
+
+			let durPrefixo = 3.5;
+			let durIa = 5.0;
+
+			const recalcular = () => {
+				const totalSeg = Math.max(2, Math.ceil(durPrefixo + durIa - 1.5));
+				fimVinhetaNoArMsRef.current = inicioMs + totalSeg * 1000;
+				setTempoRestanteVinhetaSeg(
+					Math.max(0, Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000)),
+				);
+			};
+
+			probePrefixo.addEventListener(
+				"loadedmetadata",
+				() => {
+					if (Number.isFinite(probePrefixo.duration) && probePrefixo.duration > 0) {
+						durPrefixo = probePrefixo.duration;
+						recalcular();
+					}
+				},
+				{ once: true },
+			);
+
+			probeIa.addEventListener(
+				"loadedmetadata",
+				() => {
+					if (Number.isFinite(probeIa.duration) && probeIa.duration > 0) {
+						durIa = probeIa.duration;
+						recalcular();
+					}
+				},
+				{ once: true },
+			);
+
+			try {
+				probePrefixo.load();
+				probeIa.load();
+			} catch {
+				// ignore
+			}
+		} else if (urlVinheta) {
 			const probe = new Audio();
 			probe.preload = "metadata";
 			probe.muted = true;
@@ -1008,6 +1058,8 @@ export const useLocutorMesa = () => {
 					vinheta_ativa: {
 						arquivo: alvo.arquivo,
 						url: alvo.url || alvo.arquivo,
+						prefixo: alvo.prefixo || null,
+						url_prefixo: alvo.url_prefixo || null,
 						nome: alvo.nome,
 						acao: "tocar",
 						timestamp: Date.now(),
@@ -1080,6 +1132,12 @@ export const useLocutorMesa = () => {
 					nome: `Recado: ${pedido.nome}`,
 					arquivo: dados.arquivo,
 					url: dados.url || dados.arquivo,
+					prefixo:
+						dados.prefixo ||
+						"vinhetas/aarquivos_vinhetas_prefixo/recadinhosFlash.mp3",
+					url_prefixo:
+						dados.url_prefixo ||
+						"/radio/vinhetas/aarquivos_vinhetas_prefixo/recadinhosFlash.mp3",
 					excluirAposTocar: true,
 				});
 			} catch (err) {

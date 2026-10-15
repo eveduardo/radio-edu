@@ -25,6 +25,14 @@ export const RadioPlayerProvider = ({ children }) => {
 				onEnded={radio.handleTrackEnded}
 				onError={radio.handleTrackError}
 			/>
+			<audio
+				ref={radio.playerDeckBRef}
+				autoPlay
+				preload="auto"
+				crossOrigin="anonymous"
+				onEnded={radio.handleTrackEnded}
+				onError={radio.handleTrackError}
+			/>
 			<audio ref={radio.playerHoraRef} preload="auto" crossOrigin="anonymous" />
 			<audio ref={radio.playerVozRef} preload="auto" crossOrigin="anonymous" />
 			<audio

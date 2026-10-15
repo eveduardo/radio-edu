@@ -14,6 +14,7 @@ import styles from "../pages/RadioPlayerPage.module.css";
 export const HorizontalVuMeter = ({
 	estaTocando,
 	playerRef,
+	playerDeckBRef,
 	audioCtxRef,
 	analyserRef,
 	dataArrayRef,
@@ -49,7 +50,10 @@ export const HorizontalVuMeter = ({
 			const analyser = analyserRef.current;
 			const audioCtx = audioCtxRef.current;
 			const dataArray = dataArrayRef.current;
-			const player = playerRef.current;
+			const playerA = playerRef?.current;
+			const playerB = playerDeckBRef?.current;
+			const algumTocando =
+				(playerA && !playerA.paused) || (playerB && !playerB.paused);
 
 			let dadosPresentes = false;
 			if (
@@ -57,8 +61,7 @@ export const HorizontalVuMeter = ({
 				audioCtx &&
 				audioCtx.state === "running" &&
 				estaTocando &&
-				player &&
-				!player.paused &&
+				algumTocando &&
 				dataArray
 			) {
 				analyser.getByteFrequencyData(dataArray);
@@ -102,7 +105,7 @@ export const HorizontalVuMeter = ({
 					// Curva psicoacústica de compensação para agudos responderem no mesmo nível dos graves
 					const compensacaoAgudos = 1 + b * 0.08;
 					intensidade = Math.min(1, (pico / 235) * compensacaoAgudos);
-				} else if (estaTocando && player && !player.paused) {
+				} else if (estaTocando && algumTocando) {
 					// Animação rítmica caso Web Audio ainda esteja inicializando
 					const onda = Math.sin(animTick * 1.4 + b * 0.75) * 0.35 + 0.45;
 					const ruido = (Math.sin(animTick * 3.7 + b * 2.1) + 1) * 0.15;
@@ -132,7 +135,14 @@ export const HorizontalVuMeter = ({
 		return () => {
 			if (animId) cancelAnimationFrame(animId);
 		};
-	}, [analyserRef, audioCtxRef, dataArrayRef, estaTocando, playerRef]);
+	}, [
+		analyserRef,
+		audioCtxRef,
+		dataArrayRef,
+		estaTocando,
+		playerRef,
+		playerDeckBRef,
+	]);
 
 	return (
 		<div className={styles.vuMeterBox}>

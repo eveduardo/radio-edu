@@ -18,7 +18,11 @@ export const useRadioPlayer = () => {
 	const [statusTexto, setStatusTexto] = useState("Transmitindo em tempo real");
 	const [recolhido, setRecolhido] = useState(false);
 
-	const playerRef = useRef(null);
+	const playerRef = useRef(null); // Deck A
+	const playerDeckBRef = useRef(null); // Deck B
+	const deckAtivoRef = useRef("A");
+	const emTransicaoAntecipadaRef = useRef(false);
+
 	const playerHoraRef = useRef(null);
 	const playerVozRef = useRef(null);
 	const playerVinhetaRef = useRef(null);
@@ -30,6 +34,7 @@ export const useRadioPlayer = () => {
 	const gainNodeVozRef = useRef(null);
 	const dataArrayRef = useRef(null);
 	const sourceNodeMusicaRef = useRef(null);
+	const sourceNodeMusicaBRef = useRef(null);
 	const sourceNodeVozRef = useRef(null);
 
 	const estaTocandoRef = useRef(estaTocando);
@@ -97,12 +102,27 @@ export const useRadioPlayer = () => {
 			}
 		}
 
-		const player = playerRef.current;
-		if (player) {
+		const deckAtivo =
+			deckAtivoRef.current === "A"
+				? playerRef.current
+				: playerDeckBRef.current;
+		const deckOcioso =
+			deckAtivoRef.current === "A"
+				? playerDeckBRef.current
+				: playerRef.current;
+
+		if (deckAtivo && !emTransicaoAntecipadaRef.current) {
 			try {
-				player.volume = volumeFinalMusica;
+				deckAtivo.volume = volumeFinalMusica;
 			} catch {
 				// Ignora erro em dispositivos com volume fixo por botões físicos (ex.: iOS)
+			}
+		}
+		if (deckOcioso && !emTransicaoAntecipadaRef.current) {
+			try {
+				deckOcioso.volume = 0;
+			} catch {
+				// ignore
 			}
 		}
 
@@ -174,18 +194,34 @@ export const useRadioPlayer = () => {
 				ctx.resume().catch(() => {});
 			}
 
-			// Conecta o elemento <audio> principal ao grafo Web Audio para análise real de frequência (UV)
-			const player = playerRef.current;
+			// Conecta os decks <audio> ao grafo Web Audio para análise real de frequência (UV) e crossfade
+			const playerA = playerRef.current;
 			if (
 				ctx &&
-				player &&
+				playerA &&
 				!sourceNodeMusicaRef.current &&
 				gainNodeMusicaRef.current
 			) {
 				try {
-					const source = ctx.createMediaElementSource(player);
+					const source = ctx.createMediaElementSource(playerA);
 					source.connect(gainNodeMusicaRef.current);
 					sourceNodeMusicaRef.current = source;
+				} catch {
+					// Já conectado anteriormente
+				}
+			}
+
+			const playerB = playerDeckBRef.current;
+			if (
+				ctx &&
+				playerB &&
+				!sourceNodeMusicaBRef.current &&
+				gainNodeMusicaRef.current
+			) {
+				try {
+					const sourceB = ctx.createMediaElementSource(playerB);
+					sourceB.connect(gainNodeMusicaRef.current);
+					sourceNodeMusicaBRef.current = sourceB;
 				} catch {
 					// Já conectado anteriormente
 				}
@@ -406,77 +442,92 @@ export const useRadioPlayer = () => {
 				const pausadoNaMesa =
 					data.pausado === true ||
 					estadoMesaRef.current?.musica_tocando === false;
-				const player = playerRef.current;
+				const deckAtivo =
+					deckAtivoRef.current === "A"
+						? playerRef.current
+						: playerDeckBRef.current;
+				const deckOcioso =
+					deckAtivoRef.current === "A"
+						? playerDeckBRef.current
+						: playerRef.current;
 
 				if (
-					player &&
+					deckAtivo &&
 					(forcarProxima ||
 						recarregarAudio ||
 						!urlFaixaAtualRef.current ||
 						urlFaixaAtualRef.current !== novaUrl)
 				) {
 					urlFaixaAtualRef.current = novaUrl;
-					player.muted = false;
-					player.src = novaUrl;
+					deckAtivo.muted = false;
+					deckAtivo.src = novaUrl;
+
+					// Pré-carrega a próxima faixa no deck ocioso para virada antecipada suave
+					if (
+						deckOcioso &&
+						proximaUrlRef.current &&
+						deckOcioso.src !== proximaUrlRef.current
+					) {
+						deckOcioso.src = proximaUrlRef.current;
+						deckOcioso.preload = "auto";
+					}
+
 					aplicarVolumesMesa();
 
 					const posicionarOffset = () => {
 						if (!forcarProxima && offsetExato > 2) {
 							try {
-								player.currentTime = offsetExato;
+								deckAtivo.currentTime = offsetExato;
 							} catch {
 								// ignore seek error before metadata
 							}
 						}
 					};
 
-					if (player.readyState >= 1) {
+					if (deckAtivo.readyState >= 1) {
 						posicionarOffset();
 					} else {
-						player.addEventListener("loadedmetadata", posicionarOffset, {
+						deckAtivo.addEventListener("loadedmetadata", posicionarOffset, {
 							once: true,
 						});
 					}
 
 					if (pausadoNaMesa) {
-						player.pause();
+						deckAtivo.pause();
 					} else if (estaTocandoRef.current) {
 						if (audioCtxRef.current?.state === "suspended") {
 							audioCtxRef.current.resume().catch(() => {});
 						}
 
 						const iniciarPlay = () => {
-							player.muted = false;
+							deckAtivo.muted = false;
 							aplicarVolumesMesa();
-							player
+							deckAtivo
 								.play()
 								.then(() => {
 									setStatusTexto("Transmitindo em tempo real");
 								})
 								.catch((err) => {
 									if (err?.name === "AbortError") {
-										player.addEventListener(
+										deckAtivo.addEventListener(
 											"canplay",
 											() => {
 												if (
 													estaTocandoRef.current &&
 													estadoMesaRef.current?.musica_tocando !== false &&
-													player.paused
+													deckAtivo.paused
 												) {
-													player.muted = false;
+													deckAtivo.muted = false;
 													aplicarVolumesMesa();
-													player.play().catch(() => {});
+													deckAtivo.play().catch(() => {});
 												}
 											},
 											{ once: true },
 										);
 										return;
 									}
-									// Se o navegador bloqueou autoplay com som na primeira abertura sem gesto,
-									// inicia a reprodução tocando com muted para manter a rádio sincronizada
-									// e desbloqueia o som ao menor toque/interação
-									player.muted = true;
-									player
+									deckAtivo.muted = true;
+									deckAtivo
 										.play()
 										.then(() => {
 											setStatusTexto("Transmitindo em tempo real");
@@ -487,19 +538,19 @@ export const useRadioPlayer = () => {
 
 						iniciarPlay();
 					}
-				} else if (player && pausadoNaMesa) {
-					if (!player.paused) {
-						player.pause();
+				} else if (deckAtivo && pausadoNaMesa) {
+					if (!deckAtivo.paused) {
+						deckAtivo.pause();
 					}
 				} else if (
-					player &&
+					deckAtivo &&
 					estaTocandoRef.current &&
-					!player.paused &&
-					player.readyState >= 2 &&
-					Math.abs(player.currentTime - offsetExato) > 4
+					!deckAtivo.paused &&
+					deckAtivo.readyState >= 2 &&
+					Math.abs(deckAtivo.currentTime - offsetExato) > 4
 				) {
 					try {
-						player.currentTime = offsetExato;
+						deckAtivo.currentTime = offsetExato;
 					} catch {
 						// ignore
 					}
@@ -617,18 +668,21 @@ export const useRadioPlayer = () => {
 
 	const alternarReproducao = useCallback(() => {
 		inicializarAudioContext();
-		const player = playerRef.current;
+		const deckAtivo =
+			deckAtivoRef.current === "A"
+				? playerRef.current
+				: playerDeckBRef.current;
 
 		// Se o áudio estava mudo devido ao bloqueio de autoplay do navegador na abertura,
 		// o primeiro toque deve liberar o som imediatamente, e não pausar
-		if (player && player.muted) {
-			player.muted = false;
+		if (deckAtivo && deckAtivo.muted) {
+			deckAtivo.muted = false;
 			aplicarVolumesMesa();
 			estaTocandoRef.current = true;
 			setEstaTocando(true);
 			setStatusTexto("Transmitindo em tempo real");
-			if (player.paused) {
-				player.play().catch(() => {});
+			if (deckAtivo.paused) {
+				deckAtivo.play().catch(() => {});
 			}
 			return;
 		}
@@ -638,16 +692,16 @@ export const useRadioPlayer = () => {
 			setEstaTocando(true);
 			setStatusTexto("Iniciando transmissão...");
 
-			if (player) {
-				player.muted = false;
+			if (deckAtivo) {
+				deckAtivo.muted = false;
 			}
 			aplicarVolumesMesa();
 
 			if (estadoMesaRef.current?.musica_tocando === false) {
 				setStatusTexto("Transmitindo em tempo real");
 				sincronizarRadio(false, { recarregarAudio: true });
-			} else if (player?.src && player.src !== window.location.href) {
-				player
+			} else if (deckAtivo?.src && deckAtivo.src !== window.location.href) {
+				deckAtivo
 					.play()
 					.then(() => {
 						setStatusTexto("Transmitindo em tempo real");
@@ -661,7 +715,8 @@ export const useRadioPlayer = () => {
 		} else {
 			estaTocandoRef.current = false;
 			setEstaTocando(false);
-			player?.pause();
+			playerRef.current?.pause();
+			playerDeckBRef.current?.pause();
 			playerVozRef.current?.pause();
 			playerVinhetaRef.current?.pause();
 			if (sourceNodeVozRef.current) {
@@ -694,6 +749,113 @@ export const useRadioPlayer = () => {
 
 		return () => clearInterval(interval);
 	}, [sincronizarRadio]);
+
+	// Monitoramento contínuo da faixa para transição suave antecipada de 2s
+	useEffect(() => {
+		const interval = setInterval(() => {
+			if (
+				!estaTocandoRef.current ||
+				emTransicaoAntecipadaRef.current ||
+				emTransicaoSuaveRef.current ||
+				vinhetaEmExecucaoRef.current ||
+				estadoMesaRef.current?.musica_tocando === false
+			) {
+				return;
+			}
+
+			const deckAtual =
+				deckAtivoRef.current === "A"
+					? playerRef.current
+					: playerDeckBRef.current;
+			const deckProximo =
+				deckAtivoRef.current === "A"
+					? playerDeckBRef.current
+					: playerRef.current;
+
+			if (
+				!deckAtual ||
+				deckAtual.paused ||
+				!Number.isFinite(deckAtual.duration) ||
+				deckAtual.duration < 5
+			) {
+				return;
+			}
+
+			const restante = deckAtual.duration - deckAtual.currentTime;
+			// Quando faltar <= 2.0s para o término da música, já entra a próxima faixa!
+			if (restante <= 2.0 && restante > 0) {
+				emTransicaoAntecipadaRef.current = true;
+				const proximaUrl = proximaUrlRef.current;
+				const volMaster = Math.max(0, Math.min(1, volumeMasterRef.current));
+				const volMesa =
+					typeof estadoMesaRef.current?.musica_volume === "number"
+						? Math.max(0, Math.min(1, estadoMesaRef.current.musica_volume))
+						: 1.0;
+				const volAlvo = Math.max(0, Math.min(1, volMaster * volMesa));
+
+				if (deckProximo && proximaUrl) {
+					deckProximo.src = proximaUrl;
+					deckProximo.currentTime = 0;
+					try {
+						deckProximo.volume = volAlvo;
+					} catch {
+						// ignore
+					}
+					deckProximo.play().catch(() => {});
+				}
+
+				// Fade out suave na faixa que encerra durante os 2 segundos
+				const fadeInterval = setInterval(() => {
+					if (!deckAtual || deckAtual.paused) {
+						clearInterval(fadeInterval);
+						return;
+					}
+					const r = deckAtual.duration - deckAtual.currentTime;
+					if (r <= 0.1) {
+						clearInterval(fadeInterval);
+						deckAtual.pause();
+						try {
+							deckAtual.currentTime = 0;
+							deckAtual.volume = 0;
+						} catch {
+							// ignore
+						}
+					} else {
+						try {
+							deckAtual.volume = Math.max(0, volAlvo * (r / 2.0));
+						} catch {
+							// ignore
+						}
+					}
+				}, 100);
+
+				setTimeout(() => {
+					clearInterval(fadeInterval);
+					if (deckAtual) {
+						deckAtual.pause();
+						try {
+							deckAtual.currentTime = 0;
+							deckAtual.volume = 0;
+						} catch {
+							// ignore
+						}
+					}
+
+					deckAtivoRef.current = deckAtivoRef.current === "A" ? "B" : "A";
+					if (proximaUrl) {
+						urlFaixaAtualRef.current = proximaUrl;
+					}
+					emTransicaoAntecipadaRef.current = false;
+					aplicarVolumesMesa();
+
+					// Notifica o servidor para atualizar a programação
+					sincronizarRadio(true);
+				}, 2100);
+			}
+		}, 250);
+
+		return () => clearInterval(interval);
+	}, [aplicarVolumesMesa, sincronizarRadio]);
 
 	// Desbloqueio imediato de áudio em qualquer interação, toque ou movimento na tela
 	useEffect(() => {
@@ -840,29 +1002,126 @@ export const useRadioPlayer = () => {
 			) {
 				ultimaVinhetaTocadaRef.current = dados.vinheta_ativa.timestamp;
 				const playerVinheta = playerVinhetaRef.current;
-				const playerMusica = playerRef.current;
+				const playerVoz = playerVozRef.current;
+				const deckAtivo =
+					deckAtivoRef.current === "A"
+						? playerRef.current
+						: playerDeckBRef.current;
 
 				if (dados.vinheta_ativa.acao === "parar") {
 					vinhetaEmExecucaoRef.current = false;
 					playerVinheta?.pause();
+					playerVoz?.pause();
 					if (
 						estaTocandoRef.current &&
-						playerMusica &&
-						playerMusica.paused &&
-						playerMusica.src
+						deckAtivo &&
+						deckAtivo.paused &&
+						deckAtivo.src
 					) {
-						playerMusica.play().catch(() => {});
+						deckAtivo.play().catch(() => {});
 					}
 					aplicarVolumesMesa();
 				} else {
 					const caminhoVinheta =
 						dados.vinheta_ativa.url || dados.vinheta_ativa.arquivo || "";
 					const urlVinheta = resolveRadioAssetUrl(caminhoVinheta);
-					if (playerVinheta && urlVinheta && estaTocandoRef.current) {
+					const caminhoPrefixo = dados.vinheta_ativa.prefixo || null;
+
+					// Se possui vinheta de prefixo (ex: recadinhosFlash.mp3 antes da voz da IA)
+					if (
+						caminhoPrefixo &&
+						playerVinheta &&
+						urlVinheta &&
+						estaTocandoRef.current
+					) {
 						vinhetaEmExecucaoRef.current = true;
-						// PAUSA TOTAL DA MÚSICA AO DISPARAR VINHETA
-						if (playerMusica && !playerMusica.paused) {
-							playerMusica.pause();
+						if (deckAtivo && !deckAtivo.paused) {
+							deckAtivo.pause();
+						}
+
+						const urlPrefixo = resolveRadioAssetUrl(caminhoPrefixo);
+						playerVinheta.src = urlPrefixo;
+						aplicarVolumesMesa();
+
+						if (playerVoz) {
+							playerVoz.src = urlVinheta;
+							playerVoz.load();
+						}
+
+						let iaIniciada = false;
+						let finalizado = false;
+
+						const encerrarRecado = () => {
+							if (finalizado) return;
+							finalizado = true;
+							playerVinheta.ontimeupdate = null;
+							playerVinheta.onended = null;
+							playerVinheta.onerror = null;
+							if (playerVoz) {
+								playerVoz.onended = null;
+								playerVoz.onerror = null;
+							}
+							vinhetaEmExecucaoRef.current = false;
+							aplicarVolumesMesa();
+							if (
+								estaTocandoRef.current &&
+								deckAtivo &&
+								deckAtivo.paused &&
+								deckAtivo.src
+							) {
+								deckAtivo.play().catch(() => {});
+							}
+							if (caminhoVinheta.includes("temp_")) {
+								limparTempVinheta(caminhoVinheta).catch(() => {});
+							}
+						};
+
+						const iniciarVozIa = () => {
+							if (iaIniciada) return;
+							iaIniciada = true;
+							if (playerVoz && estaTocandoRef.current) {
+								aplicarVolumesMesa();
+								playerVoz.currentTime = 0;
+								playerVoz.play().catch(() => {});
+								playerVoz.onended = encerrarRecado;
+								playerVoz.onerror = encerrarRecado;
+							}
+						};
+
+						// Intercala: faltando ~1.5s para concluir a vinheta de prefixo, já inicia a voz da IA
+						playerVinheta.ontimeupdate = () => {
+							if (iaIniciada) return;
+							const dur = playerVinheta.duration;
+							const cur = playerVinheta.currentTime;
+							if (Number.isFinite(dur) && dur > 1.5) {
+								if (dur - cur <= 1.5) {
+									iniciarVozIa();
+								}
+							}
+						};
+
+						playerVinheta.onended = () => {
+							iniciarVozIa();
+							if (!playerVoz || !urlVinheta) {
+								encerrarRecado();
+							}
+						};
+
+						playerVinheta.onerror = () => {
+							iniciarVozIa();
+							if (!playerVoz || !urlVinheta) {
+								encerrarRecado();
+							}
+						};
+
+						playerVinheta.play().catch(() => {
+							iniciarVozIa();
+						});
+					} else if (playerVinheta && urlVinheta && estaTocandoRef.current) {
+						// Vinheta normal sem prefixo
+						vinhetaEmExecucaoRef.current = true;
+						if (deckAtivo && !deckAtivo.paused) {
+							deckAtivo.pause();
 						}
 						playerVinheta.src = urlVinheta;
 						aplicarVolumesMesa();
@@ -870,20 +1129,21 @@ export const useRadioPlayer = () => {
 						const restaurarMusicaOuvinte = () => {
 							vinhetaEmExecucaoRef.current = false;
 							aplicarVolumesMesa();
-							// DÁ O PLAY NOVAMENTE NA MÚSICA APÓS O TÉRMINO DA VINHETA
 							if (
 								estaTocandoRef.current &&
-								playerMusica &&
-								playerMusica.paused &&
-								playerMusica.src
+								deckAtivo &&
+								deckAtivo.paused &&
+								deckAtivo.src
 							) {
-								playerMusica.play().catch(() => {});
+								deckAtivo.play().catch(() => {});
+							}
+							if (caminhoVinheta.includes("temp_")) {
+								limparTempVinheta(caminhoVinheta).catch(() => {});
 							}
 						};
 
 						playerVinheta.onended = restaurarMusicaOuvinte;
 						playerVinheta.onerror = restaurarMusicaOuvinte;
-
 						playerVinheta.play().catch(() => {
 							restaurarMusicaOuvinte();
 						});
@@ -1029,35 +1289,42 @@ export const useRadioPlayer = () => {
 	}, [estaTocando, nomeOuvinte, proximaFaixa, tituloMusica]);
 
 	const handleTrackEnded = useCallback(() => {
-		if (emTransicaoSuaveRef.current) return;
+		if (emTransicaoSuaveRef.current || emTransicaoAntecipadaRef.current) return;
 
-		const player = playerRef.current;
+		const deckOcioso =
+			deckAtivoRef.current === "A"
+				? playerDeckBRef.current
+				: playerRef.current;
 		const proximaUrl = proximaUrlRef.current;
 
-		// 1. Transição síncrona imediata para manter a reprodução ativa em segundo plano no celular
-		// O navegador mobile exige chamada síncrona no evento ended para não bloquear como autoplay restrito
-		if (player && proximaUrl && estaTocandoRef.current) {
+		// 1. Transição imediata no deck ocioso para manter a reprodução contínua
+		if (deckOcioso && proximaUrl && estaTocandoRef.current) {
 			urlFaixaAtualRef.current = proximaUrl;
-			player.muted = false;
-			player.src = proximaUrl;
+			deckOcioso.muted = false;
+			deckOcioso.src = proximaUrl;
+			deckAtivoRef.current = deckAtivoRef.current === "A" ? "B" : "A";
 			aplicarVolumesMesa();
-			player.play().catch(() => {});
+			deckOcioso.play().catch(() => {});
 		}
 
 		setStatusTexto("Carregando próxima música...");
 
-		// 2. Consulta o servidor para atualizar títulos, pedidos atendidos e metadados
-		sincronizarRadio(false).then((data) => {
+		// 2. Consulta o servidor para avançar e atualizar títulos e metadados
+		sincronizarRadio(true).then((data) => {
 			const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
+			const deck =
+				deckAtivoRef.current === "A"
+					? playerRef.current
+					: playerDeckBRef.current;
 			if (
-				player &&
+				deck &&
 				urlServidor &&
 				urlServidor !== urlFaixaAtualRef.current &&
 				estaTocandoRef.current
 			) {
 				urlFaixaAtualRef.current = urlServidor;
-				player.src = urlServidor;
-				player.play().catch(() => {});
+				deck.src = urlServidor;
+				deck.play().catch(() => {});
 			}
 		});
 	}, [aplicarVolumesMesa, sincronizarRadio]);
@@ -1078,6 +1345,7 @@ export const useRadioPlayer = () => {
 		volumeMaster,
 		recolhido,
 		playerRef,
+		playerDeckBRef,
 		playerHoraRef,
 		playerVozRef,
 		playerVinhetaRef,

@@ -28,6 +28,7 @@ const RadioPlayerContent = () => {
 		volumeMaster,
 		recolhido,
 		playerRef,
+		playerDeckBRef,
 		audioCtxRef,
 		analyserRef,
 		dataArrayRef,
@@ -59,6 +60,7 @@ const RadioPlayerContent = () => {
 					<HorizontalVuMeter
 						estaTocando={estaTocando}
 						playerRef={playerRef}
+						playerDeckBRef={playerDeckBRef}
 						audioCtxRef={audioCtxRef}
 						analyserRef={analyserRef}
 						dataArrayRef={dataArrayRef}
