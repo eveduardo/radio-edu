@@ -6,11 +6,18 @@ import { api, resolveRadioAssetUrl } from "./api";
  *
  * @param {Object} [options]
  * @param {boolean} [options.forcarProxima=false]
+ * @param {string} [options.sessaoOuvinte=null]
  */
-export const fetchRadioSync = async ({ forcarProxima = false } = {}) => {
+export const fetchRadioSync = async ({
+	forcarProxima = false,
+	sessaoOuvinte = null,
+} = {}) => {
 	const params = { t: Date.now() };
 	if (forcarProxima) {
 		params.forcar_proxima = "1";
+	}
+	if (sessaoOuvinte) {
+		params.sessao_ouvinte = sessaoOuvinte;
 	}
 
 	const { data } = await api.get("/radio_sync.php", { params });
@@ -292,3 +299,46 @@ export const gerarVozRecadoIA = async ({
 	const { data } = await api.post("/gerar_recado_ia.php", formData);
 	return data;
 };
+
+/**
+ * Envia um pulso de atividade (heartbeat) do ouvinte conectado (`radio_sync.php?ping_ouvinte=...`).
+ *
+ * @param {string} sessionId
+ * @returns {Promise<{sucesso: boolean, ouvintes_conectados: number, pico_hoje: number}>}
+ */
+export const pingListenerHeartbeat = async (sessionId) => {
+	if (!sessionId) return null;
+	const { data } = await api.get("/radio_sync.php", {
+		params: { ping_ouvinte: sessionId, t: Date.now() },
+	});
+	return data;
+};
+
+/**
+ * Notifica a desconexão imediata do ouvinte (`radio_sync.php?desconectar_ouvinte=...`).
+ *
+ * @param {string} sessionId
+ */
+export const disconnectListener = (sessionId) => {
+	if (!sessionId) return;
+	const baseUrl = (ENV.apiUrl || "").replace(/\/+$/, "");
+	const url = `${baseUrl}/radio_sync.php?desconectar_ouvinte=${encodeURIComponent(sessionId)}`;
+	if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+		navigator.sendBeacon(url);
+	} else {
+		fetch(url, { keepalive: true }).catch(() => {});
+	}
+};
+
+/**
+ * Obtém os números consolidados de audiência da rádio (`radio_sync.php?obter_audiencia=1`).
+ *
+ * @returns {Promise<{sucesso: boolean, ouvintes_conectados: number, pico_hoje: number}>}
+ */
+export const fetchListenerAudience = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { obter_audiencia: "1", t: Date.now() },
+	});
+	return data;
+};
+

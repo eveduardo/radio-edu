@@ -2,12 +2,28 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRecoilState } from "recoil";
 import { volumeAtom } from "@/globalState";
 import {
+	disconnectListener,
 	fetchRadioSync,
 	fetchVoiceChunkBlob,
 	limparTempVinheta,
+	pingListenerHeartbeat,
 	resolveRadioAssetUrl,
 	subscribeToMesa,
 } from "@/services";
+
+const obterSessaoOuvinte = () => {
+	if (typeof window === "undefined") return "";
+	let id = sessionStorage.getItem("radio_ouvinte_id");
+	if (!id) {
+		id = `ouv_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+		try {
+			sessionStorage.setItem("radio_ouvinte_id", id);
+		} catch {
+			// ignore
+		}
+	}
+	return id;
+};
 
 export const useRadioPlayer = () => {
 	const [volumeMaster, setVolumeMaster] = useRecoilState(volumeAtom);
@@ -369,7 +385,8 @@ export const useRadioPlayer = () => {
 			sincronizandoRef.current = true;
 
 			try {
-				const data = await fetchRadioSync({ forcarProxima });
+				const sessaoOuvinte = estaTocandoRef.current ? obterSessaoOuvinte() : null;
+				const data = await fetchRadioSync({ forcarProxima, sessaoOuvinte });
 
 				if (!data || data.error) {
 					setTituloMusica(data?.error || "Sem programação");
@@ -646,6 +663,7 @@ export const useRadioPlayer = () => {
 			estaTocandoRef.current = true;
 			setEstaTocando(true);
 			setStatusTexto("Transmitindo em tempo real");
+			pingListenerHeartbeat(obterSessaoOuvinte()).catch(() => {});
 			if (deckAtivo.paused) {
 				deckAtivo.play().catch(() => {});
 			}
@@ -656,6 +674,7 @@ export const useRadioPlayer = () => {
 			estaTocandoRef.current = true;
 			setEstaTocando(true);
 			setStatusTexto("Iniciando transmissão...");
+			pingListenerHeartbeat(obterSessaoOuvinte()).catch(() => {});
 
 			if (deckAtivo) {
 				deckAtivo.muted = false;
@@ -680,6 +699,10 @@ export const useRadioPlayer = () => {
 		} else {
 			estaTocandoRef.current = false;
 			setEstaTocando(false);
+			const sid = sessionStorage.getItem("radio_ouvinte_id");
+			if (sid) {
+				disconnectListener(sid);
+			}
 			playerRef.current?.pause();
 			playerDeckBRef.current?.pause();
 			playerVozRef.current?.pause();
@@ -702,7 +725,7 @@ export const useRadioPlayer = () => {
 		setRecolhido((prev) => !prev);
 	}, []);
 
-	// Sincronização inicial e intervalo de 30s
+	// Sincronização inicial e intervalo de 25s
 	useEffect(() => {
 		sincronizarRadio(false);
 
@@ -710,10 +733,47 @@ export const useRadioPlayer = () => {
 			if (estaTocandoRef.current && !emTransicaoSuaveRef.current) {
 				sincronizarRadio(false);
 			}
-		}, 30000);
+		}, 25000);
 
 		return () => clearInterval(interval);
 	}, [sincronizarRadio]);
+
+	// Heartbeat contínuo de ouvinte ativo
+	useEffect(() => {
+		const enviarPing = () => {
+			if (estaTocando) {
+				const sid = obterSessaoOuvinte();
+				if (sid) pingListenerHeartbeat(sid).catch(() => {});
+			}
+		};
+
+		if (estaTocando) {
+			enviarPing();
+			const interval = setInterval(enviarPing, 25000);
+			return () => clearInterval(interval);
+		} else {
+			const sid = sessionStorage.getItem("radio_ouvinte_id");
+			if (sid) {
+				disconnectListener(sid);
+			}
+		}
+	}, [estaTocando]);
+
+	// Desconexão imediata ao fechar a aba
+	useEffect(() => {
+		const aoFecharAba = () => {
+			const sid = sessionStorage.getItem("radio_ouvinte_id");
+			if (sid && estaTocandoRef.current) {
+				disconnectListener(sid);
+			}
+		};
+
+		window.addEventListener("beforeunload", aoFecharAba);
+		return () => {
+			window.removeEventListener("beforeunload", aoFecharAba);
+			aoFecharAba();
+		};
+	}, []);
 
 	// Monitoramento contínuo da faixa para transição suave antecipada de 2s
 	useEffect(() => {

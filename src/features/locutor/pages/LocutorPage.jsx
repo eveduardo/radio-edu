@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { Badge, Button, Input, Modal } from "@jposawa/ronin-ui";
+import { Button, Input, Modal } from "@jposawa/ronin-ui";
 import { VerticalVuMeter } from "../components/VerticalVuMeter";
 import { useLocutorMesa } from "../hooks/useLocutorMesa";
 import styles from "./LocutorPage.module.css";
@@ -18,6 +18,8 @@ const LocutorPage = () => {
 		proximaAtual,
 		tempoRestanteFormatado,
 		transicaoEmAndamento,
+		ouvintesConectados,
+		picoHoje,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,
@@ -115,13 +117,17 @@ const LocutorPage = () => {
 						<span className={styles.relogioPonto}>●</span>
 						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
 					</div>
-					<Badge
-						intent={aoVivo ? "danger" : "neutral"}
-						variant="filled"
-						className={clsx(styles.statusBadge, aoVivo && styles.noAr)}
+					<div
+						className={styles.badgeAudiencia}
+						title={`Audiência em tempo real: ${ouvintesConectados} ouvinte(s) conectado(s)${picoHoje > 0 ? ` • Pico hoje: ${picoHoje}` : ""}`}
 					>
-						{aoVivo ? "NO AR" : "STANDBY"}
-					</Badge>
+						<span className={styles.badgeAudienciaPonto}>●</span>
+						<span className={styles.badgeAudienciaIcone}>👥</span>
+						<span className={styles.badgeAudienciaQtd}>{ouvintesConectados}</span>
+						<span className={styles.badgeAudienciaRotulo}>
+							{ouvintesConectados === 1 ? "ouvinte" : "ouvintes"}
+						</span>
+					</div>
 				</div>
 
 				{/* SEÇÃO DA MESA COM FADERS E VU METERS */}

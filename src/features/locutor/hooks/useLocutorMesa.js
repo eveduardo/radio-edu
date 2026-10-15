@@ -3,6 +3,7 @@ import {
 	cancelarTrincaIa,
 	discardNextTrack,
 	fetchGenresCatalog,
+	fetchListenerAudience,
 	fetchListenerRequests,
 	fetchRadioSync,
 	fetchVinhetasCatalog,
@@ -97,6 +98,8 @@ export const useLocutorMesa = () => {
 	const [proximaAtual, setProximaAtual] = useState("A seguir: --");
 	const [tempoRestanteSeg, setTempoRestanteSeg] = useState(0);
 	const [transicaoEmAndamento, setTransicaoEmAndamento] = useState(false);
+	const [ouvintesConectados, setOuvintesConectados] = useState(0);
+	const [picoHoje, setPicoHoje] = useState(0);
 
 	const [pedidos, setPedidos] = useState([]);
 	const [mapaGeneros, setMapaGeneros] = useState({});
@@ -482,6 +485,13 @@ export const useLocutorMesa = () => {
 					setMusicaPausada(data.pausado);
 				}
 
+				if (typeof data.ouvintes_conectados !== "undefined") {
+					setOuvintesConectados(Number(data.ouvintes_conectados) || 0);
+				}
+				if (typeof data.pico_hoje !== "undefined") {
+					setPicoHoje(Number(data.pico_hoje) || 0);
+				}
+
 				if (data.bloco_trinca) {
 					setBlocoTrinca({
 						contagem: data.bloco_trinca.contagem || 0,
@@ -634,6 +644,23 @@ export const useLocutorMesa = () => {
 		monitorarMusicaNoAr();
 		const syncInterval = setInterval(monitorarMusicaNoAr, 15000);
 
+		const checarAudiencia = async () => {
+			try {
+				const audData = await fetchListenerAudience();
+				if (audData && typeof audData.ouvintes_conectados !== "undefined") {
+					setOuvintesConectados(Number(audData.ouvintes_conectados) || 0);
+				}
+				if (audData && typeof audData.pico_hoje !== "undefined") {
+					setPicoHoje(Number(audData.pico_hoje) || 0);
+				}
+			} catch {
+				// ignore
+			}
+		};
+
+		checarAudiencia();
+		const audInterval = setInterval(checarAudiencia, 10000);
+
 		const countdownInterval = setInterval(() => {
 			if (musicaPausadaRef.current) return;
 
@@ -651,6 +678,7 @@ export const useLocutorMesa = () => {
 
 		return () => {
 			clearInterval(syncInterval);
+			clearInterval(audInterval);
 			clearInterval(countdownInterval);
 		};
 	}, [monitorarMusicaNoAr]);
@@ -1361,6 +1389,8 @@ export const useLocutorMesa = () => {
 		tempoRestanteVinhetaSeg,
 		tempoRestanteVinhetaFormatado: `${minVinheta}:${segVinheta}`,
 		transicaoEmAndamento,
+		ouvintesConectados,
+		picoHoje,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,
