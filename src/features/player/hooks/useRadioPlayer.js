@@ -666,6 +666,44 @@ export const useRadioPlayer = () => {
 		}
 	}, [ajustarVolume]);
 
+	const ativarWakeLock = useCallback(async () => {
+		try {
+			if ("wakeLock" in navigator && estaTocandoRef.current) {
+				const lock = await navigator.wakeLock.request("screen");
+				wakeLockRef.current = lock;
+				lock.addEventListener("release", () => {
+					wakeLockRef.current = null;
+				});
+			}
+		} catch {
+			// Silencioso se o aparelho não suportar ou economia de bateria ativa
+		}
+	}, []);
+
+	const libertarWakeLock = useCallback(() => {
+		if (wakeLockRef.current) {
+			wakeLockRef.current
+				.release()
+				.then(() => {
+					wakeLockRef.current = null;
+				})
+				.catch(() => {});
+		}
+	}, []);
+
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "visible" && estaTocandoRef.current) {
+				ativarWakeLock();
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () => {
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			libertarWakeLock();
+		};
+	}, [ativarWakeLock, libertarWakeLock]);
+
 	const alternarReproducao = useCallback(() => {
 		inicializarAudioContext();
 		const deckAtivo =
@@ -682,6 +720,7 @@ export const useRadioPlayer = () => {
 			setEstaTocando(true);
 			setStatusTexto("Transmitindo em tempo real");
 			pingListenerHeartbeat(obterSessaoOuvinte()).catch(() => {});
+			ativarWakeLock();
 			if (deckAtivo.paused) {
 				deckAtivo.play().catch(() => {});
 			}
@@ -693,6 +732,7 @@ export const useRadioPlayer = () => {
 			setEstaTocando(true);
 			setStatusTexto("Iniciando transmissão...");
 			pingListenerHeartbeat(obterSessaoOuvinte()).catch(() => {});
+			ativarWakeLock();
 
 			// Destrava elementos auxiliares e deck B no gesto do usuário (requisito para background no iOS e Android)
 			playerVozRef.current?.play().catch(() => {});
@@ -723,6 +763,7 @@ export const useRadioPlayer = () => {
 		} else {
 			estaTocandoRef.current = false;
 			setEstaTocando(false);
+			libertarWakeLock();
 			const sid = sessionStorage.getItem("radio_ouvinte_id");
 			if (sid) {
 				disconnectListener(sid);
@@ -743,7 +784,7 @@ export const useRadioPlayer = () => {
 			tocandoVozRef.current = false;
 			setStatusTexto("Em pausa");
 		}
-	}, [aplicarVolumesMesa, inicializarAudioContext, sincronizarRadio]);
+	}, [aplicarVolumesMesa, ativarWakeLock, inicializarAudioContext, libertarWakeLock, sincronizarRadio]);
 
 	const alternarExpansaoCard = useCallback(() => {
 		setRecolhido((prev) => !prev);
