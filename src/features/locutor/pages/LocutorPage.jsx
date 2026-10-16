@@ -20,6 +20,7 @@ const LocutorPage = () => {
 		transicaoEmAndamento,
 		ouvintesConectados,
 		picoHoje,
+		programaAtual,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,
@@ -65,7 +66,6 @@ const LocutorPage = () => {
 	} = useLocutorMesa();
 
 	const [modalTrincaAberto, setModalTrincaAberto] = useState(false);
-	const [textoTrincaCopiado, setTextoTrincaCopiado] = useState(false);
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
 	const [buscaMusicaModal, setBuscaMusicaModal] = useState("");
 	const [vinhetaCategoriaAtiva, setVinhetaCategoriaAtiva] = useState(null);
@@ -113,6 +113,19 @@ const LocutorPage = () => {
 			<div className={styles.containerMesa}>
 				<div className={styles.topoMesa}>
 					<h1 className={styles.titulo}>🎙️ MESA MASTER</h1>
+					{programaAtual && (
+						<div
+							className={styles.badgeProgramaMesa}
+							title={`${programaAtual.nome || "Programa"} (${programaAtual.horario || ""})${programaAtual.slogan ? ` - ${programaAtual.slogan}` : ""}`}
+						>
+							<span className={styles.badgeProgramaIcone}>
+								{programaAtual.icone || "📻"}
+							</span>
+							<span className={styles.badgeProgramaNome}>
+								{programaAtual.nome}
+							</span>
+						</div>
+					)}
 					<div className={styles.relogioMesa} title="Horário de Brasília em tempo real">
 						<span className={styles.relogioPonto}>●</span>
 						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
@@ -343,7 +356,18 @@ const LocutorPage = () => {
 				{/* CARD DE STATUS DA MÚSICA */}
 				<div className={styles.cardMusicaNoAr}>
 					<div className={styles.statusLinhaTopo}>
-						<span>● No Ar Agora</span>
+						<div className={styles.statusLinhaTopoEsquerda}>
+							<span>● No Ar Agora</span>
+							{programaAtual && (
+								<span
+									className={styles.badgeProgramaCard}
+									title={`${programaAtual.nome || "Programa"} (${programaAtual.horario || ""})`}
+								>
+									<span>{programaAtual.icone || "📻"}</span>
+									<span>{programaAtual.nome}</span>
+								</span>
+							)}
+						</div>
 						<div className={styles.statusTopoRight}>
 							{tempoRestanteVinhetaSeg > 0 && (
 								<span
@@ -810,23 +834,6 @@ const LocutorPage = () => {
 					</div>
 
 					<div className={styles.blocoTextoLocucao}>
-						<div className={styles.headerTextoLocucao}>
-							<span>🎙️ Texto do Arquivo Temporário (Para ler no Microfone):</span>
-							<button
-								type="button"
-								className={styles.btnCopiarTrinca}
-								onClick={() => {
-									const txt =
-										blocoTrinca?.texto_anuncio ||
-										"Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!... Fique ligado que tem muito mais som pra você!";
-									navigator.clipboard?.writeText(txt);
-									setTextoTrincaCopiado(true);
-									setTimeout(() => setTextoTrincaCopiado(false), 2000);
-								}}
-							>
-								{textoTrincaCopiado ? "✅ Copiado!" : "📋 Copiar"}
-							</button>
-						</div>
 						<div className={styles.caixaTeleprompter}>
 							{blocoTrinca?.texto_anuncio ||
 								"Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!... Fique ligado que tem muito mais som pra você!"}

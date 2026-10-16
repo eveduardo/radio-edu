@@ -100,6 +100,7 @@ export const useLocutorMesa = () => {
 	const [transicaoEmAndamento, setTransicaoEmAndamento] = useState(false);
 	const [ouvintesConectados, setOuvintesConectados] = useState(0);
 	const [picoHoje, setPicoHoje] = useState(0);
+	const [programaAtual, setProgramaAtual] = useState(null);
 
 	const [pedidos, setPedidos] = useState([]);
 	const [mapaGeneros, setMapaGeneros] = useState({});
@@ -490,6 +491,9 @@ export const useLocutorMesa = () => {
 				}
 				if (typeof data.pico_hoje !== "undefined") {
 					setPicoHoje(Number(data.pico_hoje) || 0);
+				}
+				if (data.programa) {
+					setProgramaAtual(data.programa);
 				}
 
 				if (data.bloco_trinca) {
@@ -1391,6 +1395,7 @@ export const useLocutorMesa = () => {
 		transicaoEmAndamento,
 		ouvintesConectados,
 		picoHoje,
+		programaAtual,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,

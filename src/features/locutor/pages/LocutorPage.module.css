@@ -76,6 +76,36 @@
 	}
 }
 
+.badgeProgramaMesa {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: rgba(15, 23, 42, 0.9);
+	border: 1px solid rgba(56, 189, 248, 0.4);
+	padding: 3px 9px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 700;
+	color: #38bdf8;
+	max-width: 200px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: default;
+}
+
+.badgeProgramaIcone {
+	font-size: 13px;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.badgeProgramaNome {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .badgeAudiencia {
 	display: inline-flex;
 	align-items: center;
@@ -455,6 +485,34 @@
 	text-transform: uppercase;
 	letter-spacing: 0.6px;
 	color: #f54b4b;
+	gap: 6px;
+}
+
+.statusLinhaTopoEsquerda {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	overflow: hidden;
+	min-width: 0;
+}
+
+.badgeProgramaCard {
+	background: #0f172a;
+	border: 1px solid #1e293b;
+	padding: 2px 7px;
+	border-radius: 10px;
+	font-size: 10.5px;
+	font-weight: 700;
+	color: #38bdf8;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 200px;
+	text-transform: none;
+	letter-spacing: normal;
 }
 
 .statusTopoRight {
