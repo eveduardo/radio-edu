@@ -18,9 +18,9 @@ export const VinylDisc = ({ girando }) => {
 			<div className={styles.descansoBraco} title="Descanso do braço" />
 			<svg
 				className={styles.bracoTocaDiscos}
-				viewBox="0 0 58 58"
-				width="58"
-				height="58"
+				viewBox="0 0 64 56"
+				width="64"
+				height="56"
 				aria-hidden="true"
 			>
 				<defs>
@@ -37,18 +37,19 @@ export const VinylDisc = ({ girando }) => {
 						<stop offset="100%" stopColor="#475569" />
 					</linearGradient>
 				</defs>
+				{/* Eixo / Pivô posicionado fora do disco de vinil */}
 				<circle
-					cx="48"
-					cy="8"
-					r="4.8"
+					cx="56"
+					cy="7"
+					r="3.8"
 					fill="#334155"
 					stroke="#64748b"
-					strokeWidth="0.8"
+					strokeWidth="0.7"
 				/>
 				<circle
-					cx="48"
-					cy="8"
-					r="2.2"
+					cx="56"
+					cy="7"
+					r="1.8"
 					fill="#e2e8f0"
 					stroke="#1e293b"
 					strokeWidth="0.5"
@@ -60,51 +61,51 @@ export const VinylDisc = ({ girando }) => {
 					)}
 				>
 					<rect
-						x="46"
+						x="54.5"
 						y="2"
-						width="4"
-						height="5"
-						rx="1.5"
+						width="3"
+						height="4.5"
+						rx="1"
 						fill="#1e293b"
 						stroke="#64748b"
-						strokeWidth="0.6"
+						strokeWidth="0.5"
 					/>
 					<path
-						d="M 48 8 Q 48 24 38 42"
+						d="M 56 7 Q 54 22 37 39"
 						fill="none"
 						stroke="url(#hasteMetalReact)"
-						strokeWidth="2"
+						strokeWidth="1.3"
 						strokeLinecap="round"
 					/>
 					<path
-						d="M 48 8 Q 48 24 38 42"
+						d="M 56 7 Q 54 22 37 39"
 						fill="none"
 						stroke="#ffffff"
-						strokeWidth="0.6"
+						strokeWidth="0.4"
 						strokeLinecap="round"
 						opacity="0.8"
 					/>
-					<g transform="translate(38, 42) rotate(24)">
+					<g transform="translate(37, 39) rotate(22)">
 						<rect
-							x="-3"
+							x="-2.2"
 							y="0"
-							width="6"
-							height="8.5"
-							rx="1.5"
+							width="4.4"
+							height="6.8"
+							rx="1.2"
 							fill="#0f172a"
 							stroke="#f59e0b"
-							strokeWidth="0.75"
+							strokeWidth="0.6"
 						/>
 						<line
 							x1="0"
-							y1="4"
+							y1="2.5"
 							x2="0"
-							y2="8"
+							y2="6.2"
 							stroke="#ef4444"
-							strokeWidth="1.3"
+							strokeWidth="1"
 							strokeLinecap="round"
 						/>
-						<circle cx="1.5" cy="2" r="0.6" fill="#fff" opacity="0.9" />
+						<circle cx="1" cy="1.5" r="0.4" fill="#fff" opacity="0.9" />
 					</g>
 				</g>
 			</svg>
