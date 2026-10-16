@@ -25,6 +25,23 @@ const obterSessaoOuvinte = () => {
 	return id;
 };
 
+const normalizarUrlAudio = (u) => {
+	if (!u) return "";
+	try {
+		const p = new URL(
+			u,
+			typeof window !== "undefined"
+				? window.location.href
+				: "http://localhost",
+		).pathname;
+		return decodeURIComponent(p).toLowerCase().trim();
+	} catch {
+		return decodeURIComponent(u.split("?")[0])
+			.toLowerCase()
+			.trim();
+	}
+};
+
 export const useRadioPlayer = () => {
 	const [volumeMaster, setVolumeMaster] = useRecoilState(volumeAtom);
 	const [estaTocando, setEstaTocando] = useState(true);
@@ -440,19 +457,19 @@ export const useRadioPlayer = () => {
 						? playerDeckBRef.current
 						: playerRef.current;
 
-				const mesmaFaixaJaTocando =
-					urlFaixaAtualRef.current === novaUrl &&
+				const mesmoArquivoJaCarregado =
+					normalizarUrlAudio(urlFaixaAtualRef.current) ===
+						normalizarUrlAudio(novaUrl) &&
 					deckAtivo &&
-					!deckAtivo.paused &&
-					!recarregarAudio;
+					deckAtivo.src;
 
 				if (
 					deckAtivo &&
-					!mesmaFaixaJaTocando &&
-					(forcarProxima ||
-						recarregarAudio ||
+					!mesmoArquivoJaCarregado &&
+					(recarregarAudio ||
 						!urlFaixaAtualRef.current ||
-						urlFaixaAtualRef.current !== novaUrl)
+						normalizarUrlAudio(urlFaixaAtualRef.current) !==
+							normalizarUrlAudio(novaUrl))
 				) {
 					urlFaixaAtualRef.current = novaUrl;
 					deckAtivo.muted = false;
@@ -471,7 +488,7 @@ export const useRadioPlayer = () => {
 					aplicarVolumesMesa();
 
 					const posicionarOffset = () => {
-						if (!forcarProxima && offsetExato > 2) {
+						if (!forcarProxima && offsetExato > 2 && !novaUrl.includes("temp_trinca")) {
 							try {
 								deckAtivo.currentTime = offsetExato;
 							} catch {
@@ -543,6 +560,7 @@ export const useRadioPlayer = () => {
 					estaTocandoRef.current &&
 					!deckAtivo.paused &&
 					deckAtivo.readyState >= 2 &&
+					!novaUrl.includes("temp_trinca") &&
 					Math.abs(deckAtivo.currentTime - offsetExato) > 4
 				) {
 					try {
@@ -791,6 +809,19 @@ export const useRadioPlayer = () => {
 				vinhetaEmExecucaoRef.current ||
 				estadoMesaRef.current?.musica_tocando === false
 			) {
+				return;
+			}
+
+			// Locuções e vinhetas da IA (como anúncio de trincas) devem falar até a última palavra sem corte de crossfade!
+			const eLocucaoAtual =
+				urlFaixaAtualRef.current &&
+				(urlFaixaAtualRef.current.includes("temp_trinca") ||
+					urlFaixaAtualRef.current.includes("vinhetas/"));
+			const eLocucaoProxima =
+				proximaUrlRef.current &&
+				(proximaUrlRef.current.includes("temp_trinca") ||
+					proximaUrlRef.current.includes("vinhetas/"));
+			if (eLocucaoAtual || eLocucaoProxima) {
 				return;
 			}
 
@@ -1374,7 +1405,8 @@ export const useRadioPlayer = () => {
 			if (
 				deck &&
 				urlServidor &&
-				urlServidor !== urlFaixaAtualRef.current &&
+				normalizarUrlAudio(urlServidor) !==
+					normalizarUrlAudio(urlFaixaAtualRef.current) &&
 				estaTocandoRef.current
 			) {
 				urlFaixaAtualRef.current = urlServidor;
@@ -1387,8 +1419,8 @@ export const useRadioPlayer = () => {
 	const handleTrackError = useCallback(() => {
 		if (emTransicaoSuaveRef.current) return;
 		setStatusTexto("Reconectando áudio...");
-		// Se o arquivo atual falhou (ex.: 404), avança para a próxima faixa válida no servidor
-		setTimeout(() => sincronizarRadio(true, { recarregarAudio: true }), 1500);
+		// Reconecta o áudio sem forçar pulo prematuro de música
+		setTimeout(() => sincronizarRadio(false, { recarregarAudio: true }), 2500);
 	}, [sincronizarRadio]);
 
 	return {
