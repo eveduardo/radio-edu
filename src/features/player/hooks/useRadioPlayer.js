@@ -676,6 +676,12 @@ export const useRadioPlayer = () => {
 			setStatusTexto("Iniciando transmissão...");
 			pingListenerHeartbeat(obterSessaoOuvinte()).catch(() => {});
 
+			// Destrava elementos auxiliares e deck B no gesto do usuário (requisito para background no iOS e Android)
+			playerVozRef.current?.play().catch(() => {});
+			playerHoraRef.current?.play().catch(() => {});
+			playerVinhetaRef.current?.play().catch(() => {});
+			playerDeckBRef.current?.play().then(() => playerDeckBRef.current?.pause()).catch(() => {});
+
 			if (deckAtivo) {
 				deckAtivo.muted = false;
 			}
@@ -887,26 +893,29 @@ export const useRadioPlayer = () => {
 		const desbloquear = () => {
 			inicializarAudioContext();
 
-			const player = playerRef.current;
+			const deckAtual =
+				deckAtivoRef.current === "A"
+					? playerRef.current
+					: playerDeckBRef.current;
 			if (
-				!player ||
+				!deckAtual ||
 				!estaTocandoRef.current ||
-				!player.src ||
+				!deckAtual.src ||
 				estadoMesaRef.current?.musica_tocando === false
 			) {
 				return;
 			}
 
-			if (player.muted) {
-				player.muted = false;
+			if (deckAtual.muted) {
+				deckAtual.muted = false;
 				aplicarVolumesMesa();
 			}
 
-			if (player.paused) {
-				player
+			if (deckAtual.paused) {
+				deckAtual
 					.play()
 					.then(() => {
-						player.muted = false;
+						deckAtual.muted = false;
 						aplicarVolumesMesa();
 						setStatusTexto("Transmitindo em tempo real");
 					})
@@ -951,24 +960,30 @@ export const useRadioPlayer = () => {
 				aplicarVolumesMesa();
 			}
 
-			const player = playerRef.current;
+			const deckAtual =
+				deckAtivoRef.current === "A"
+					? playerRef.current
+					: playerDeckBRef.current;
 			if (dados.musica_tocando === false && !vinhetaEmExecucaoRef.current) {
-				if (player && !player.paused) {
-					player.pause();
+				if (playerRef.current && !playerRef.current.paused) {
+					playerRef.current.pause();
+				}
+				if (playerDeckBRef.current && !playerDeckBRef.current.paused) {
+					playerDeckBRef.current.pause();
 				}
 			} else if (
 				dados.musica_tocando === true &&
 				estaTocandoRef.current &&
-				player &&
-				player.paused &&
-				player.src &&
+				deckAtual &&
+				deckAtual.paused &&
+				deckAtual.src &&
 				!vinhetaEmExecucaoRef.current &&
 				!emTransicaoSuaveRef.current
 			) {
-				player
+				deckAtual
 					.play()
 					.then(() => {
-						player.muted = false;
+						deckAtual.muted = false;
 						aplicarVolumesMesa();
 						setStatusTexto("Transmitindo em tempo real");
 					})
@@ -1306,35 +1321,50 @@ export const useRadioPlayer = () => {
 					title: tituloMusica || "Flash FM",
 					artist: nomeOuvinte || "Flash FM — Ao Vivo",
 					album: proximaFaixa || "Transmissão em tempo real",
+					artwork: [
+						{
+							src: `${import.meta.env.BASE_URL}img/logoFM.jpg`,
+							sizes: "512x512",
+							type: "image/jpeg",
+						},
+					],
 				});
 			}
+			navigator.mediaSession.setActionHandler("play", () => {
+				alternarReproducao();
+			});
+			navigator.mediaSession.setActionHandler("pause", () => {
+				alternarReproducao();
+			});
 		} catch {
 			// Ignora caso o navegador não suporte MediaMetadata
 		}
-	}, [estaTocando, nomeOuvinte, proximaFaixa, tituloMusica]);
+	}, [alternarReproducao, estaTocando, nomeOuvinte, proximaFaixa, tituloMusica]);
 
 	const handleTrackEnded = useCallback(() => {
 		if (emTransicaoSuaveRef.current || emTransicaoAntecipadaRef.current) return;
 
-		const deckOcioso =
+		// Em celular com a tela apagada (background), o áudio PRECISA continuar tocando imediatamente
+		// dentro do evento nativo síncrono onended para que o iOS Safari e o Android não bloqueiem
+		// a reprodução por falta de gesto do usuário!
+		const deckAtual =
 			deckAtivoRef.current === "A"
-				? playerDeckBRef.current
-				: playerRef.current;
+				? playerRef.current
+				: playerDeckBRef.current;
 		const proximaUrl = proximaUrlRef.current;
 
-		// 1. Transição imediata no deck ocioso para manter a reprodução contínua
-		if (deckOcioso && proximaUrl && estaTocandoRef.current) {
+		if (deckAtual && proximaUrl && estaTocandoRef.current) {
 			urlFaixaAtualRef.current = proximaUrl;
-			deckOcioso.muted = false;
-			deckOcioso.src = proximaUrl;
-			deckAtivoRef.current = deckAtivoRef.current === "A" ? "B" : "A";
+			deckAtual.muted = false;
+			deckAtual.src = proximaUrl;
+			deckAtual.currentTime = 0;
 			aplicarVolumesMesa();
-			deckOcioso.play().catch(() => {});
+			deckAtual.play().catch(() => {});
 		}
 
 		setStatusTexto("Carregando próxima música...");
 
-		// 2. Consulta o servidor para avançar e atualizar títulos e metadados
+		// Notifica o servidor para avançar a programação e atualizar títulos e metadados
 		sincronizarRadio(true).then((data) => {
 			const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
 			const deck =
