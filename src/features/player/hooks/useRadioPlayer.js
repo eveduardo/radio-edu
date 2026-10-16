@@ -911,7 +911,7 @@ export const useRadioPlayer = () => {
 					aplicarVolumesMesa();
 
 					// Notifica o servidor para atualizar a programação
-					sincronizarRadio(true);
+					sincronizarRadio(false);
 				}, 2100);
 			}
 		}, 250);
@@ -1395,8 +1395,8 @@ export const useRadioPlayer = () => {
 
 		setStatusTexto("Carregando próxima música...");
 
-		// Notifica o servidor para avançar a programação e atualizar títulos e metadados
-		sincronizarRadio(true).then((data) => {
+		// Notifica o servidor para atualizar a programação e títulos
+		sincronizarRadio(false).then((data) => {
 			const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
 			const deck =
 				deckAtivoRef.current === "A"
