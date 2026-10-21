@@ -561,7 +561,7 @@ export const useRadioPlayer = () => {
 					!deckAtivo.paused &&
 					deckAtivo.readyState >= 2 &&
 					!novaUrl.includes("temp_trinca") &&
-					Math.abs(deckAtivo.currentTime - offsetExato) > 4
+					Math.abs(deckAtivo.currentTime - offsetExato) > 8
 				) {
 					try {
 						deckAtivo.currentTime = offsetExato;
@@ -1417,16 +1417,19 @@ export const useRadioPlayer = () => {
 		}
 	}, [alternarReproducao, estaTocando, nomeOuvinte, proximaFaixa, tituloMusica]);
 
-	const handleTrackEnded = useCallback(() => {
+	const handleTrackEnded = useCallback((e) => {
 		if (emTransicaoSuaveRef.current || emTransicaoAntecipadaRef.current) return;
 
-		// Em celular com a tela apagada (background), o áudio PRECISA continuar tocando imediatamente
-		// dentro do evento nativo síncrono onended para que o iOS Safari e o Android não bloqueiem
-		// a reprodução por falta de gesto do usuário!
+		// Se o evento ended veio de um deck ocioso (ex.: deck anterior que acabou de sofrer fade-out), descarta!
+		const deckDisparador = e && e.target;
 		const deckAtual =
 			deckAtivoRef.current === "A"
 				? playerRef.current
 				: playerDeckBRef.current;
+
+		if (deckDisparador && deckDisparador !== deckAtual) {
+			return;
+		}
 		const proximaUrl = proximaUrlRef.current;
 
 		if (deckAtual && proximaUrl && estaTocandoRef.current) {

@@ -50,7 +50,45 @@ export const fetchRadioSync = async ({
 			// ignora caso playlist_cache.json não esteja acessível
 		}
 
+		let grade = null;
+		try {
+			const resGrade = await api.get("/grade_programacao.json", { params: { t: Date.now() } });
+			grade = resGrade.data?.programas || [];
+		} catch {
+			// ignora caso grade_programacao.json não esteja acessível
+		}
+
 		const agoraSeg = Math.floor(Date.now() / 1000);
+
+		const obterProgramaAtual = () => {
+			if (!grade || !Array.isArray(grade) || grade.length === 0) return null;
+			const agora = new Date();
+			const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
+			for (const prog of grade) {
+				const [hI, mI] = (prog.inicio || "00:00").split(":").map(Number);
+				const [hF, mF] = (prog.fim || "00:00").split(":").map(Number);
+				const iniMin = hI * 60 + mI;
+				let fimMin = hF * 60 + mF;
+				if (fimMin === 0 && iniMin > 0) fimMin = 1440;
+				if (fimMin > iniMin) {
+					if (minutosAgora >= iniMin && minutosAgora < fimMin) return prog;
+				} else {
+					if (minutosAgora >= iniMin || minutosAgora < fimMin) return prog;
+				}
+			}
+			return grade[0];
+		};
+		const progAtual = obterProgramaAtual();
+		const progPayload = progAtual ? {
+			id: progAtual.id || "",
+			nome: progAtual.nome || "",
+			slogan: progAtual.slogan || "",
+			horario: `${progAtual.inicio} às ${progAtual.fim}`,
+			inicio: progAtual.inicio || "",
+			fim: progAtual.fim || "",
+			apresentador: progAtual.apresentador || "",
+			icone: progAtual.icone || "📻",
+		} : null;
 
 		if (noAr && noAr.nome && noAr.url) {
 			const inicio = noAr.inicio_timestamp || agoraSeg;
@@ -73,6 +111,7 @@ export const fetchRadioSync = async ({
 						nome: noAr.proxima_nome || (playlist[0]?.nome ?? ""),
 						url: noAr.proxima_url || (playlist[0]?.url ?? ""),
 					},
+					programa: progPayload,
 				};
 			}
 		}
@@ -100,6 +139,7 @@ export const fetchRadioSync = async ({
 					nome: proximaFaixa?.nome || "",
 					url: proximaFaixa?.url || "",
 				},
+				programa: progPayload,
 			};
 		}
 	} catch (fallbackErr) {
