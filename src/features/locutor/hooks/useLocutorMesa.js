@@ -1250,11 +1250,16 @@ export const useLocutorMesa = () => {
 					});
 					monitorarMusicaNoAr();
 				}
-			} catch {
+			} catch (err) {
+				const msgErro =
+					err?.response?.data?.erro ||
+					err?.response?.data?.error ||
+					err?.message ||
+					"Erro ao agendar música do ouvinte.";
 				setAvisoModal({
 					icone: "⚠️",
-					titulo: "Erro",
-					mensagem: "Erro ao agendar música do ouvinte.",
+					titulo: "Erro no Pedido",
+					mensagem: `Não foi possível agendar a música do ouvinte:\n${msgErro}`,
 				});
 			}
 		},
@@ -1350,11 +1355,16 @@ export const useLocutorMesa = () => {
 						mensagem: "O servidor não confirmou o agendamento.",
 					});
 				}
-			} catch {
+			} catch (err) {
+				const msgErro =
+					err?.response?.data?.erro ||
+					err?.response?.data?.error ||
+					err?.message ||
+					"Erro de conexão ao agendar a música.";
 				setAvisoModal({
 					icone: "⚠️",
 					titulo: "Erro de Conexão",
-					mensagem: "Erro de conexão ao agendar a música.",
+					mensagem: `Não foi possível agendar a música:\n${msgErro}`,
 				});
 			}
 		},
