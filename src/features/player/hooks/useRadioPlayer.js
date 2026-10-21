@@ -88,6 +88,7 @@ export const useRadioPlayer = () => {
 	const ultimaVinhetaTocadaRef = useRef(0);
 	const primeiraCargaFirebaseRef = useRef(true);
 	const ultimaTrocaForcadaRef = useRef(0);
+	const faixaRecemConcluidaRef = useRef(null);
 	const ultimaAtualizacaoProgRef = useRef(0);
 	const emTransicaoSuaveRef = useRef(false);
 	const sincronizandoRef = useRef(false);
@@ -391,11 +392,12 @@ export const useRadioPlayer = () => {
 
 
 	const sincronizarRadio = useCallback(
-		async (forcarProxima = false, { recarregarAudio = false } = {}) => {
+		async (forcarProxima = false, { recarregarAudio = false, faixaConcluida = false } = {}) => {
 			if (
 				sincronizandoRef.current &&
 				!forcarProxima &&
-				!recarregarAudio
+				!recarregarAudio &&
+				!faixaConcluida
 			) {
 				return null;
 			}
@@ -403,7 +405,7 @@ export const useRadioPlayer = () => {
 
 			try {
 				const sessaoOuvinte = estaTocandoRef.current ? obterSessaoOuvinte() : null;
-				const data = await fetchRadioSync({ forcarProxima, sessaoOuvinte });
+				const data = await fetchRadioSync({ forcarProxima, faixaConcluida, sessaoOuvinte });
 
 				if (!data || data.error) {
 					setTituloMusica(data?.error || "Sem programação");
@@ -471,6 +473,15 @@ export const useRadioPlayer = () => {
 						normalizarUrlAudio(urlFaixaAtualRef.current) !==
 							normalizarUrlAudio(novaUrl))
 				) {
+					// Previne recarregar os últimos segundos da faixa que acabou de concluir neste cliente
+					if (
+						faixaRecemConcluidaRef.current &&
+						normalizarUrlAudio(novaUrl) === normalizarUrlAudio(faixaRecemConcluidaRef.current)
+					) {
+						return data;
+					}
+					faixaRecemConcluidaRef.current = null;
+
 					urlFaixaAtualRef.current = novaUrl;
 					deckAtivo.muted = false;
 					deckAtivo.src = novaUrl;
@@ -1433,6 +1444,7 @@ export const useRadioPlayer = () => {
 		const proximaUrl = proximaUrlRef.current;
 
 		if (deckAtual && proximaUrl && estaTocandoRef.current) {
+			faixaRecemConcluidaRef.current = urlFaixaAtualRef.current;
 			urlFaixaAtualRef.current = proximaUrl;
 			deckAtual.muted = false;
 			deckAtual.src = proximaUrl;
@@ -1443,13 +1455,21 @@ export const useRadioPlayer = () => {
 
 		setStatusTexto("Carregando próxima música...");
 
-		// Notifica o servidor para atualizar a programação e títulos
-		sincronizarRadio(false).then((data) => {
+		// Notifica o servidor que a faixa foi concluída (faixaConcluida: true)
+		sincronizarRadio(false, { faixaConcluida: true }).then((data) => {
 			const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
 			const deck =
 				deckAtivoRef.current === "A"
 					? playerRef.current
 					: playerDeckBRef.current;
+			// Se o servidor ainda respondeu com a faixa que acabou de concluir, descarta
+			if (
+				urlServidor &&
+				faixaRecemConcluidaRef.current &&
+				normalizarUrlAudio(urlServidor) === normalizarUrlAudio(faixaRecemConcluidaRef.current)
+			) {
+				return;
+			}
 			if (
 				deck &&
 				urlServidor &&

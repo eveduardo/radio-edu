@@ -10,11 +10,15 @@ import { api, resolveRadioAssetUrl } from "./api";
  */
 export const fetchRadioSync = async ({
 	forcarProxima = false,
+	faixaConcluida = false,
 	sessaoOuvinte = null,
 } = {}) => {
 	const params = { t: Date.now() };
 	if (forcarProxima) {
 		params.forcar_proxima = "1";
+	}
+	if (faixaConcluida) {
+		params.faixa_concluida = "1";
 	}
 	if (sessaoOuvinte) {
 		params.sessao_ouvinte = sessaoOuvinte;
