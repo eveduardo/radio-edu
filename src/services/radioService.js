@@ -20,8 +20,93 @@ export const fetchRadioSync = async ({
 		params.sessao_ouvinte = sessaoOuvinte;
 	}
 
-	const { data } = await api.get("/radio_sync.php", { params });
-	return data;
+	try {
+		const { data } = await api.get("/radio_sync.php", { params });
+		if (data && !data.error && data.faixa_atual?.url) {
+			return data;
+		}
+	} catch (err) {
+		console.warn(
+			"[fetchRadioSync] Erro ao consultar radio_sync.php, acionando fallback estático:",
+			err?.message,
+		);
+	}
+
+	// Fallback de alta resiliência: lê diretamente no_ar.json ou playlist_cache.json se o PHP oscilar
+	try {
+		let noAr = null;
+		try {
+			const resNoAr = await api.get("/no_ar.json", { params: { t: Date.now() } });
+			noAr = resNoAr.data;
+		} catch {
+			// ignora caso no_ar.json não esteja acessível
+		}
+
+		let playlist = [];
+		try {
+			const resCache = await api.get("/playlist_cache.json", { params: { t: Date.now() } });
+			playlist = resCache.data?.todas || [];
+		} catch {
+			// ignora caso playlist_cache.json não esteja acessível
+		}
+
+		const agoraSeg = Math.floor(Date.now() / 1000);
+
+		if (noAr && noAr.nome && noAr.url) {
+			const inicio = noAr.inicio_timestamp || agoraSeg;
+			const decorrido = Math.max(0, agoraSeg - inicio);
+			const duracao = noAr.duracao || 180;
+
+			if (decorrido < duracao || playlist.length === 0) {
+				return {
+					timestamp_servidor: agoraSeg,
+					ouvintes_conectados: 1,
+					pico_hoje: 1,
+					pausado: false,
+					faixa_atual: {
+						nome: noAr.nome,
+						url: noAr.url,
+						duracao: duracao,
+					},
+					offset_segundos: decorrido,
+					proxima_faixa: {
+						nome: noAr.proxima_nome || (playlist[0]?.nome ?? ""),
+						url: noAr.proxima_url || (playlist[0]?.url ?? ""),
+					},
+				};
+			}
+		}
+
+		if (playlist.length > 0) {
+			const slotDuracao = 210;
+			const indice = Math.floor(agoraSeg / slotDuracao) % playlist.length;
+			const proximoIndice = (indice + 1) % playlist.length;
+			const faixaAtual = playlist[indice];
+			const proximaFaixa = playlist[proximoIndice];
+			const offset = Math.max(0, agoraSeg % slotDuracao);
+
+			return {
+				timestamp_servidor: agoraSeg,
+				ouvintes_conectados: 1,
+				pico_hoje: 1,
+				pausado: false,
+				faixa_atual: {
+					nome: faixaAtual.nome,
+					url: faixaAtual.url,
+					duracao: faixaAtual.duracao || slotDuracao,
+				},
+				offset_segundos: Math.min(offset, (faixaAtual.duracao || slotDuracao) - 5),
+				proxima_faixa: {
+					nome: proximaFaixa?.nome || "",
+					url: proximaFaixa?.url || "",
+				},
+			};
+		}
+	} catch (fallbackErr) {
+		console.error("[fetchRadioSync] Falha no fallback:", fallbackErr);
+	}
+
+	return null;
 };
 
 /**
