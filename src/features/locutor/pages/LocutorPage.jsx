@@ -811,32 +811,70 @@ const LocutorPage = () => {
 								? "Modo: Locução IA Automática"
 								: "Modo: Locução Manual (Microfone)"}
 						</span>
-					</div>
-
-					<div className={styles.blocoInfoFaixas}>
-						<div className={styles.tituloSessaoPequena}>
-							🎵 Músicas deste bloco:
-						</div>
-						<div className={styles.listaFaixasTrinca}>
-							{(blocoTrinca?.faixas?.length
-								? blocoTrinca.faixas
-								: musicaAtual
-									? [musicaAtual]
-									: []
-							).map((f, idx) => (
-								<div key={idx} className={styles.itemFaixaTrincaLinha}>
-									<span className={styles.itemFaixaNome}>
-										{idx + 1}. {f}
-									</span>
-								</div>
-							))}
-						</div>
+						<span
+							className={styles.badgeTrincaModo}
+							style={{ color: "#38bdf8", fontWeight: 700 }}
+						>
+							🎙️ Voz IA:{" "}
+							{blocoTrinca?.locutor_nome ||
+								(blocoTrinca?.genero_voz === "feminino"
+									? "Camila (Feminina)"
+									: "Ricardo (Masculino)")}
+						</span>
 					</div>
 
 					<div className={styles.blocoTextoLocucao}>
+						<div className={styles.headerTextoLocucao}>
+							<span className={styles.tituloSessaoPequena}>
+								📜 Roteiro do Locutor (Teleprompter):
+							</span>
+							<button
+								type="button"
+								className={styles.btnCopiarTrinca}
+								onClick={() => {
+									const faixas = blocoTrinca?.faixas?.length
+										? blocoTrinca.faixas
+										: musicaAtual
+											? [musicaAtual]
+											: ["Música 1", "Música 2", "Música 3"];
+									const lista = faixas
+										.map((f, i) => `${i + 1}. ${f}`)
+										.join("\n");
+									const roteiro =
+										blocoTrinca?.texto_anuncio &&
+										blocoTrinca.texto_anuncio.includes(
+											"🎵 Músicas deste bloco:",
+										)
+											? blocoTrinca.texto_anuncio
+											: `Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!\n\n🎵 Músicas deste bloco:\n${lista}\n\nFique ligado que tem muito mais som pra você!`;
+									navigator.clipboard.writeText(roteiro).then(() => {
+										setAvisoModal({
+											icone: "📋",
+											titulo: "Copiado!",
+											mensagem: "Roteiro copiado para a área de transferência.",
+										});
+									});
+								}}
+							>
+								📋 Copiar
+							</button>
+						</div>
 						<div className={styles.caixaTeleprompter}>
-							{blocoTrinca?.texto_anuncio ||
-								"Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!... Fique ligado que tem muito mais som pra você!"}
+							{(() => {
+								if (
+									blocoTrinca?.texto_anuncio &&
+									blocoTrinca.texto_anuncio.includes("🎵 Músicas deste bloco:")
+								) {
+									return blocoTrinca.texto_anuncio;
+								}
+								const faixas = blocoTrinca?.faixas?.length
+									? blocoTrinca.faixas
+									: musicaAtual
+										? [musicaAtual]
+										: ["Música 1", "Música 2", "Música 3"];
+								const lista = faixas.map((f, i) => `${i + 1}. ${f}`).join("\n");
+								return `Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!\n\n🎵 Músicas deste bloco:\n${lista}\n\nFique ligado que tem muito mais som pra você!`;
+							})()}
 						</div>
 					</div>
 				</div>
