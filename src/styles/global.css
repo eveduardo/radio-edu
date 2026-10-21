@@ -18,7 +18,7 @@ a {
 	color: inherit;
 }
 iframe {
-	&:has(.nl-wrap){
+	:has(.nl-wrap){
 		display: none;
 	}
 }
