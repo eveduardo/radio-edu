@@ -17,4 +17,8 @@ body {
 a {
 	color: inherit;
 }
-
+iframe {
+	&:has(.nl-wrap){
+		display: none;
+	}
+}
