@@ -1,5 +1,5 @@
 import { getApps, initializeApp } from "firebase/app";
-import { getDatabase, ref, update } from "firebase/database";
+import { getDatabase, ref, update, onValue } from "firebase/database";
 import { ENV } from "@/config";
 import { api, resolveRadioAssetUrl } from "./api";
 
@@ -20,8 +20,7 @@ try {
 }
 
 /**
- * Inscreve um listener ultraleve em tempo real no arquivo estático `estado_mesa.json`
- * (Arquitetura de alta performance com ZERO conexões presas em bancos de terceiros).
+ * Inscreve um listener em tempo real no estado da mesa (Firebase Realtime + fallback HTTP em estado_mesa.json).
  *
  * @param {(dados: Record<string, any>) => void} callback
  * @returns {() => void} Função para cancelar a inscrição
@@ -31,7 +30,27 @@ export const subscribeToMesa = (callback) => {
 	let timer = null;
 	let ultimoJsonTexto = "";
 	let ehAoVivo = false;
+	let unsubscribeFirebase = null;
 
+	// 1. Canal push em tempo real via Firebase WebSocket
+	if (mesaRef) {
+		try {
+			unsubscribeFirebase = onValue(mesaRef, (snapshot) => {
+				if (!ativo) return;
+				const dados = snapshot.val();
+				if (dados) {
+					ehAoVivo = Boolean(dados.ao_vivo);
+					callback(dados);
+				}
+			});
+		} catch (err) {
+			if (ENV.isDev) {
+				console.warn("[mesaService] Falha ao registrar listener Firebase:", err);
+			}
+		}
+	}
+
+	// 2. Polling paralelo e redundante em estado_mesa.json
 	const checar = async () => {
 		if (!ativo) return;
 
@@ -66,6 +85,13 @@ export const subscribeToMesa = (callback) => {
 	return () => {
 		ativo = false;
 		if (timer) clearTimeout(timer);
+		if (typeof unsubscribeFirebase === "function") {
+			try {
+				unsubscribeFirebase();
+			} catch {
+				// ignore
+			}
+		}
 	};
 };
 
