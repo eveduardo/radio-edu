@@ -167,6 +167,7 @@ export const useLocutorMesa = () => {
 	const inicioGravacaoBlocoRef = useRef(0);
 	const timestampUltimoSomRef = useRef(0);
 	const gravandoBlocoRef = useRef(false);
+	const houveFalaNoBlocoRef = useRef(false);
 	const debounceFirebaseRef = useRef(null);
 
 	const duracaoAtualRef = useRef(0);
@@ -293,13 +294,17 @@ export const useLocutorMesa = () => {
 		};
 
 		gravador.onstop = () => {
-			if (chunksAtuaisRef.current.length > 0) {
-				const audioBlob = new Blob(chunksAtuaisRef.current, {
+			const chunksParaEnviar = chunksAtuaisRef.current.slice();
+			chunksAtuaisRef.current = [];
+			const teveFala = houveFalaNoBlocoRef.current;
+			houveFalaNoBlocoRef.current = false;
+
+			if (chunksParaEnviar.length > 0 && teveFala) {
+				const audioBlob = new Blob(chunksParaEnviar, {
 					type: mime || "audio/webm",
 				});
-				chunksAtuaisRef.current = [];
 
-				if (audioBlob.size > 400) {
+				if (audioBlob.size > 300) {
 					uploadVoiceChunk(audioBlob)
 						.then((res) => {
 							if (res?.chunk) {
@@ -318,9 +323,10 @@ export const useLocutorMesa = () => {
 		};
 
 		try {
-			gravador.start(250);
+			gravador.start(200);
 			inicioGravacaoBlocoRef.current = Date.now();
 			timestampUltimoSomRef.current = Date.now();
+			houveFalaNoBlocoRef.current = false;
 			gravandoBlocoRef.current = true;
 		} catch {
 			// ignore
@@ -343,15 +349,33 @@ export const useLocutorMesa = () => {
 		const agora = Date.now();
 		const duracaoAtual = agora - inicioGravacaoBlocoRef.current;
 
-		if (volumeMedio > 10) {
+		if (volumeMedio > 9) {
 			timestampUltimoSomRef.current = agora;
+			houveFalaNoBlocoRef.current = true;
 		}
 
 		const tempoEmSilencio = agora - timestampUltimoSomRef.current;
-		const cortePorSilencio = duracaoAtual >= 2500 && tempoEmSilencio >= 500;
-		const cortePorTetoMaximo = duracaoAtual >= 4500;
+		const houveFala = houveFalaNoBlocoRef.current;
 
-		if (gravandoBlocoRef.current && (cortePorSilencio || cortePorTetoMaximo)) {
+		// Se ainda não houve fala no bloco (apenas silêncio do estúdio):
+		if (!houveFala && duracaoAtual >= 2500) {
+			inicioGravacaoBlocoRef.current = agora;
+			timestampUltimoSomRef.current = agora;
+			loopDeteccaoIdRef.current = requestAnimationFrame(monitorarAtividadeVoz);
+			return;
+		}
+
+		// CORTE INTELIGENTE POR PAUSAS NA FALA (VAD):
+		// 1. Pausa natural entre frases/respiro: após 1.8s gravado, ao detectar pausa de 450ms corta com perfeição sem fatiar palavras
+		const cortePausaNatural = houveFala && duracaoAtual >= 1800 && tempoEmSilencio >= 450;
+		// 2. Fala mais acelerada: após 5.0s, qualquer micro-pausa de 250ms já aproveita para cortar
+		const corteMicroPausa = houveFala && duracaoAtual >= 5000 && tempoEmSilencio >= 250;
+		// 3. Teto seguro: após 8.5s, aproveita micro-pausa de 150ms
+		const corteTetoSeguro = houveFala && duracaoAtual >= 8500 && tempoEmSilencio >= 150;
+		// 4. Limite de emergência: 11s caso o locutor fale sem nenhuma pausa
+		const corteLimiteMaximo = duracaoAtual >= 11000;
+
+		if (gravandoBlocoRef.current && (cortePausaNatural || corteMicroPausa || corteTetoSeguro || corteLimiteMaximo)) {
 			gravandoBlocoRef.current = false;
 			if (
 				gravadorMediaRef.current &&
