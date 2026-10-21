@@ -17,8 +17,7 @@ body {
 a {
 	color: inherit;
 }
-iframe {
-	#nl-badge-frame {
-		display: none !important;
-	}
+
+#nl-badge-frame {
+	display: none !important;
 }
