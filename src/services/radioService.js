@@ -211,13 +211,30 @@ export const cancelarTrincaIa = async () => {
  * @returns {Promise<Record<string, Array<{id: string, arquivo: string, nome: string, genero: string, url: string, duracao: number}>>>}
  */
 export const fetchGenresCatalog = async () => {
-	const { data } = await api.get("/radio_sync.php", {
-		params: { listar_generos: "1", t: Date.now() },
-	});
+	try {
+		const { data } = await api.get("/radio_sync.php", {
+			params: { listar_generos: "1", t: Date.now() },
+		});
 
-	if (data && typeof data === "object" && !Array.isArray(data)) {
-		return data;
+		if (data && typeof data === "object" && !Array.isArray(data) && Object.keys(data).length > 0) {
+			return data;
+		}
+	} catch (err) {
+		console.warn("[fetchGenresCatalog] Falha ao consultar endpoint dinâmico, tentando fallback estático:", err?.message);
 	}
+
+	// Fallback de alta resiliência: lê diretamente o playlist_cache.json
+	try {
+		const resCache = await api.get("/playlist_cache.json", {
+			params: { t: Date.now() },
+		});
+		if (resCache.data?.generos && typeof resCache.data.generos === "object" && !Array.isArray(resCache.data.generos)) {
+			return resCache.data.generos;
+		}
+	} catch (err) {
+		console.warn("[fetchGenresCatalog] Falha ao ler playlist_cache.json diretamente:", err?.message);
+	}
+
 	return {};
 };
 
