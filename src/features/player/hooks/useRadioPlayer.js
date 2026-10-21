@@ -47,7 +47,7 @@ export const useRadioPlayer = () => {
 	const [estaTocando, setEstaTocando] = useState(true);
 	const [tituloMusica, setTituloMusica] = useState("Sintonizando Flash FM...");
 	const [nomeOuvinte, setNomeOuvinte] = useState("");
-	const [proximaFaixa, setProximaFaixa] = useState("Aguardando programação");
+	const [proximaFaixa, setProximaFaixa] = useState("");
 	const [statusTexto, setStatusTexto] = useState("Transmitindo em tempo real");
 	const [recolhido, setRecolhido] = useState(false);
 	const [programaAtual, setProgramaAtual] = useState(null);
@@ -582,10 +582,9 @@ export const useRadioPlayer = () => {
 				return data;
 			} catch (err) {
 				console.error("[useRadioPlayer] Erro ao sincronizar com o backend:", err);
-				setStatusTexto("Erro ao sincronizar rádio");
+				setStatusTexto("");
 				if (!urlFaixaAtualRef.current) {
-					setTituloMusica("Sem sinal do servidor");
-					setProximaFaixa("Verifique se o backend PHP está online");
+					setProximaFaixa("");
 				}
 				return null;
 			} finally {
