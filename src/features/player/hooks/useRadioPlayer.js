@@ -580,8 +580,13 @@ export const useRadioPlayer = () => {
 				}
 
 				return data;
-			} catch {
+			} catch (err) {
+				console.error("[useRadioPlayer] Erro ao sincronizar com o backend:", err);
 				setStatusTexto("Erro ao sincronizar rádio");
+				if (!urlFaixaAtualRef.current) {
+					setTituloMusica("Sem sinal do servidor");
+					setProximaFaixa("Verifique se o backend PHP está online");
+				}
 				return null;
 			} finally {
 				sincronizandoRef.current = false;
