@@ -832,11 +832,23 @@ const LocutorPage = () => {
 								type="button"
 								className={styles.btnCopiarTrinca}
 								onClick={() => {
-									const faixas = blocoTrinca?.faixas?.length
-										? blocoTrinca.faixas
-										: musicaAtual
-											? [musicaAtual]
-											: ["Música 1", "Música 2", "Música 3"];
+									let faixas = Array.isArray(blocoTrinca?.faixas)
+										? blocoTrinca.faixas.slice()
+										: [];
+									if (faixas.length < 3 && Array.isArray(blocoTrinca?.historico)) {
+										blocoTrinca.historico.forEach((h) => {
+											if (h && !faixas.includes(h)) faixas.unshift(h);
+										});
+									}
+									if (faixas.length < 3 && musicaAtual && !faixas.includes(musicaAtual)) {
+										faixas.push(musicaAtual);
+									}
+									faixas = faixas
+										.filter((f) => f && !f.includes("Flash FM - Sequência"))
+										.slice(-3);
+									if (faixas.length === 0) {
+										faixas = ["Música 1", "Música 2", "Música 3"];
+									}
 									const lista = faixas
 										.map((f, i) => `${i + 1}. ${f}`)
 										.join("\n");
@@ -844,7 +856,8 @@ const LocutorPage = () => {
 										blocoTrinca?.texto_anuncio &&
 										blocoTrinca.texto_anuncio.includes(
 											"🎵 Músicas deste bloco:",
-										)
+										) &&
+										/1\..+2\..+3\./s.test(blocoTrinca.texto_anuncio)
 											? blocoTrinca.texto_anuncio
 											: `Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!\n\n🎵 Músicas deste bloco:\n${lista}\n\nFique ligado que tem muito mais som pra você!`;
 									navigator.clipboard.writeText(roteiro).then(() => {
@@ -863,15 +876,28 @@ const LocutorPage = () => {
 							{(() => {
 								if (
 									blocoTrinca?.texto_anuncio &&
-									blocoTrinca.texto_anuncio.includes("🎵 Músicas deste bloco:")
+									blocoTrinca.texto_anuncio.includes("🎵 Músicas deste bloco:") &&
+									/1\..+2\..+3\./s.test(blocoTrinca.texto_anuncio)
 								) {
 									return blocoTrinca.texto_anuncio;
 								}
-								const faixas = blocoTrinca?.faixas?.length
-									? blocoTrinca.faixas
-									: musicaAtual
-										? [musicaAtual]
-										: ["Música 1", "Música 2", "Música 3"];
+								let faixas = Array.isArray(blocoTrinca?.faixas)
+									? blocoTrinca.faixas.slice()
+									: [];
+								if (faixas.length < 3 && Array.isArray(blocoTrinca?.historico)) {
+									blocoTrinca.historico.forEach((h) => {
+										if (h && !faixas.includes(h)) faixas.unshift(h);
+									});
+								}
+								if (faixas.length < 3 && musicaAtual && !faixas.includes(musicaAtual)) {
+									faixas.push(musicaAtual);
+								}
+								faixas = faixas
+									.filter((f) => f && !f.includes("Flash FM - Sequência"))
+									.slice(-3);
+								if (faixas.length === 0) {
+									faixas = ["Música 1", "Música 2", "Música 3"];
+								}
 								const lista = faixas.map((f, i) => `${i + 1}. ${f}`).join("\n");
 								return `Você acabou de curtir aqui na Flash a nossa sequência de três sucessos!\n\n🎵 Músicas deste bloco:\n${lista}\n\nFique ligado que tem muito mais som pra você!`;
 							})()}
