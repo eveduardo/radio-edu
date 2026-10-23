@@ -1,5 +1,5 @@
 import { ENV } from "@/config";
-import { api, resolveRadioAssetUrl } from "./api";
+import { api, resolveRadioAssetUrl, REMOTE_BACKEND_URL } from "./api";
 
 /**
  * Sincroniza o estado atual da programação da rádio (`radio_sync.php`).
@@ -440,14 +440,68 @@ export const gerarVozRecadoIA = async ({
 	titulo = "",
 	voz = "alternar",
 }) => {
-	const formData = new FormData();
-	formData.append("nome", nome);
-	formData.append("recado", recado);
-	formData.append("titulo", titulo);
-	formData.append("voz", voz);
+	const params = {
+		nome: nome || "Ouvinte",
+		recado: recado || "",
+		titulo: titulo || "",
+		voz: voz || "alternar",
+		t: Date.now(),
+	};
 
-	const { data } = await api.post("/gerar_recado_ia.php", formData);
-	return data;
+	// 1. Tenta POST com URLSearchParams (application/x-www-form-urlencoded)
+	try {
+		const form = new URLSearchParams();
+		form.append("nome", params.nome);
+		form.append("recado", params.recado);
+		form.append("titulo", params.titulo);
+		form.append("voz", params.voz);
+
+		const { data } = await api.post("/gerar_recado_ia.php", form, {
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			timeout: 25000,
+		});
+		if (data && data.sucesso && data.arquivo) {
+			return data;
+		}
+		if (data && data.erro) {
+			throw new Error(data.erro);
+		}
+	} catch (postErr) {
+		console.warn("[gerarVozRecadoIA] Falha no POST, tentando GET transparente:", postErr?.message);
+	}
+
+	// 2. Fallback resiliente via GET (evita preflight OPTIONS e passa direto pelo proxy Netlify)
+	try {
+		const { data } = await api.get("/gerar_recado_ia.php", {
+			params,
+			timeout: 25000,
+		});
+		if (data && data.sucesso && data.arquivo) {
+			return data;
+		}
+		if (data && data.erro) {
+			throw new Error(data.erro);
+		}
+	} catch (getErr) {
+		console.warn("[gerarVozRecadoIA] Falha no GET proxy, tentando URL remota direta:", getErr?.message);
+	}
+
+	// 3. Fallback final direto com fetch nativo no endpoint HTTPS de produção
+	const urlDireta = new URL(`${REMOTE_BACKEND_URL}/gerar_recado_ia.php`);
+	Object.entries(params).forEach(([k, v]) => urlDireta.searchParams.set(k, String(v)));
+
+	const res = await fetch(urlDireta.toString(), {
+		method: "GET",
+		mode: "cors",
+	});
+	if (!res.ok) {
+		throw new Error(`Servidor retornou status HTTP ${res.status}`);
+	}
+	const data = await res.json();
+	if (data && data.sucesso && data.arquivo) {
+		return data;
+	}
+	throw new Error(data?.erro || "Não foi possível gerar a voz neural do recado.");
 };
 
 /**

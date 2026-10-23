@@ -1,7 +1,7 @@
 import axios from "axios";
 import { ENV } from "@/config";
 
-const REMOTE_BACKEND_URL = "https://datasystem-ce.com.br/radio";
+export const REMOTE_BACKEND_URL = "https://datasystem-ce.com.br/radio";
 
 /**
  * Instância HTTP compartilhada apontando para o backend PHP da rádio.
