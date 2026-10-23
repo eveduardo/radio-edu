@@ -178,7 +178,7 @@ export const useRadioPlayer = () => {
 		const playerHora = playerHoraRef.current;
 		if (playerHora) {
 			try {
-				playerHora.volume = volumeFinalMusica;
+				playerHora.volume = volMaster;
 			} catch {
 				// Ignora erro em dispositivos com volume fixo
 			}
@@ -187,7 +187,7 @@ export const useRadioPlayer = () => {
 		const playerVinheta = playerVinhetaRef.current;
 		if (playerVinheta) {
 			try {
-				playerVinheta.volume = volumeFinalMusica;
+				playerVinheta.volume = volMaster;
 			} catch {
 				// Ignora erro em dispositivos com volume fixo
 			}
@@ -1170,12 +1170,7 @@ export const useRadioPlayer = () => {
 						playerVinheta.src = urlPrefixo;
 						aplicarVolumesMesa();
 
-						if (playerVoz) {
-							playerVoz.src = urlVinheta;
-							playerVoz.load();
-						}
-
-						let iaIniciada = false;
+						let vozIaIniciada = false;
 						let finalizado = false;
 
 						const encerrarRecado = () => {
@@ -1184,10 +1179,6 @@ export const useRadioPlayer = () => {
 							playerVinheta.ontimeupdate = null;
 							playerVinheta.onended = null;
 							playerVinheta.onerror = null;
-							if (playerVoz) {
-								playerVoz.onended = null;
-								playerVoz.onerror = null;
-							}
 							vinhetaEmExecucaoRef.current = false;
 							aplicarVolumesMesa();
 							if (
@@ -1203,47 +1194,41 @@ export const useRadioPlayer = () => {
 							}
 						};
 
-						const iniciarVozIa = () => {
-							if (iaIniciada) return;
-							iaIniciada = true;
-							if (playerVoz && estaTocandoRef.current) {
-								aplicarVolumesMesa();
-								playerVoz.currentTime = 0;
-								playerVoz.play().catch(() => {});
-								playerVoz.onended = encerrarRecado;
-								playerVoz.onerror = encerrarRecado;
+						const tocarVozIa = () => {
+							if (vozIaIniciada) return;
+							vozIaIniciada = true;
+							playerVinheta.ontimeupdate = null;
+							if (!urlVinheta) {
+								encerrarRecado();
+								return;
+							}
+							playerVinheta.src = urlVinheta;
+							aplicarVolumesMesa();
+							playerVinheta.onended = encerrarRecado;
+							playerVinheta.onerror = encerrarRecado;
+							if (estaTocandoRef.current) {
+								playerVinheta.play().catch(encerrarRecado);
 							}
 						};
 
-						// Intercala: faltando ~1.5s para concluir a vinheta de prefixo, já inicia a voz da IA
+						// Transiciona suavemente: faltando ~0.8s da vinheta de prefixo, já inicia a voz da IA
 						playerVinheta.ontimeupdate = () => {
-							if (iaIniciada) return;
+							if (vozIaIniciada) return;
 							const dur = playerVinheta.duration;
 							const cur = playerVinheta.currentTime;
-							if (Number.isFinite(dur) && dur > 1.5) {
-								if (dur - cur <= 1.5) {
-									iniciarVozIa();
+							if (Number.isFinite(dur) && dur > 1.2) {
+								if (dur - cur <= 0.8) {
+									tocarVozIa();
 								}
 							}
 						};
 
-						playerVinheta.onended = () => {
-							iniciarVozIa();
-							if (!playerVoz || !urlVinheta) {
-								encerrarRecado();
-							}
-						};
+						playerVinheta.onended = tocarVozIa;
+						playerVinheta.onerror = tocarVozIa;
 
-						playerVinheta.onerror = () => {
-							iniciarVozIa();
-							if (!playerVoz || !urlVinheta) {
-								encerrarRecado();
-							}
-						};
-
-						playerVinheta.play().catch(() => {
-							iniciarVozIa();
-						});
+						if (estaTocandoRef.current) {
+							playerVinheta.play().catch(tocarVozIa);
+						}
 					} else if (playerVinheta && urlVinheta && estaTocandoRef.current) {
 						// Vinheta normal sem prefixo
 						vinhetaEmExecucaoRef.current = true;

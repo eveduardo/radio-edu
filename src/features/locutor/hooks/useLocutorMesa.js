@@ -935,11 +935,13 @@ export const useLocutorMesa = () => {
 			probeIa.muted = true;
 			probeIa.src = urlVinheta;
 
-			let durPrefixo = 3.5;
-			let durIa = 5.0;
+			let durPrefixo = 8.0;
+			let durIa = alvo?.texto_falado?.length
+				? Math.max(10.0, Math.ceil(alvo.texto_falado.length / 10))
+				: 15.0;
 
 			const recalcular = () => {
-				const totalSeg = Math.max(2, Math.ceil(durPrefixo + durIa - 1.5));
+				const totalSeg = Math.max(5, Math.ceil(durPrefixo + durIa - 0.8));
 				fimVinhetaNoArMsRef.current = inicioMs + totalSeg * 1000;
 				setTempoRestanteVinhetaSeg(
 					Math.max(0, Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000)),
@@ -974,6 +976,7 @@ export const useLocutorMesa = () => {
 			} catch {
 				// ignore
 			}
+			recalcular();
 		} else if (urlVinheta) {
 			const probe = new Audio();
 			probe.preload = "metadata";
@@ -1195,6 +1198,7 @@ export const useLocutorMesa = () => {
 						dados.url_prefixo ||
 						"/radio/vinhetas/aarquivos_vinhetas_prefixo/recadinhosFlash.mp3",
 					excluirAposTocar: true,
+					texto_falado: dados.texto_falado || pedido.recado || "",
 				});
 			} catch (err) {
 				setAvisoModal({
