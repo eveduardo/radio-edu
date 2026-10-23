@@ -1,9 +1,14 @@
 [build]
-  command = "pnpm build"
+  command = "npm run build"
   publish = "dist"
+
+[[redirects]]
+  from = "/radio-api/*"
+  to = "https://datasystem-ce.com.br/radio/:splat"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-

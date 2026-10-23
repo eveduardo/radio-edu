@@ -1,6 +1,8 @@
 import axios from "axios";
 import { ENV } from "@/config";
 
+const REMOTE_BACKEND_URL = "https://datasystem-ce.com.br/radio";
+
 /**
  * Instância HTTP compartilhada apontando para o backend PHP da rádio.
  */
@@ -11,7 +13,32 @@ export const api = axios.create({
 
 api.interceptors.response.use(
 	(response) => response,
-	(error) => {
+	async (error) => {
+		const originalRequest = error?.config;
+
+		// Fallback automático transparente: se a requisição via proxy (/radio-api) falhar
+		// (ex.: erro de rede, 404 de proxy ou 400), tenta diretamente no endpoint HTTPS da rádio
+		if (
+			originalRequest &&
+			!originalRequest._retryDirect &&
+			(originalRequest.baseURL?.includes("radio-api") ||
+				originalRequest.url?.startsWith("/radio-api"))
+		) {
+			originalRequest._retryDirect = true;
+			originalRequest.baseURL = REMOTE_BACKEND_URL;
+			if (originalRequest.url?.startsWith("/radio-api")) {
+				originalRequest.url = originalRequest.url.replace(/^\/radio-api/, "");
+			}
+			try {
+				return await axios(originalRequest);
+			} catch (fallbackError) {
+				if (ENV.isDev) {
+					console.error("[api fallback]", fallbackError?.message);
+				}
+				return Promise.reject(fallbackError);
+			}
+		}
+
 		if (ENV.isDev) {
 			console.error("[api]", error?.response?.status, error?.message);
 		}
