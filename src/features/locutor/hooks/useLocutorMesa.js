@@ -537,16 +537,7 @@ export const useLocutorMesa = () => {
 						data.bloco_trinca.anuncio_pendente &&
 						data.bloco_trinca.anuncio_pendente !== ultimoAnuncioTrincaRef.current
 					) {
-						if (autoTrincaHabilitadoRef.current && liberarVinhetaNoArRef.current) {
-							ultimoAnuncioTrincaRef.current = data.bloco_trinca.anuncio_pendente;
-							liberarVinhetaNoArRef.current({
-								id: "trinca_" + Date.now(),
-								nome: "Trinca Flash (Locução)",
-								arquivo: data.bloco_trinca.anuncio_pendente,
-								url: data.bloco_trinca.anuncio_pendente,
-								excluirAposTocar: true,
-							});
-						}
+						ultimoAnuncioTrincaRef.current = data.bloco_trinca.anuncio_pendente;
 					}
 				}
 
@@ -1257,15 +1248,25 @@ export const useLocutorMesa = () => {
 			}
 
 			try {
+				let data = null;
 				if (identificador) {
-					await scheduleNextTrack(identificador);
+					data = await scheduleNextTrack(identificador, { tocarAgora });
 					temAgendamentoExplicitoRef.current = true;
 				}
 				await markRequestAsPlayed(pedido.chave_linha);
 				carregarPedidos();
 
 				if (tocarAgora) {
-					await transicaoSuaveProxima();
+					if (data?.faixa_atual) {
+						aplicarDadosSyncNaMesa(data);
+					}
+					await updateMesa({ musica_tocando: true, forcar_troca: Date.now() }).catch(() => {});
+					setAvisoModal({
+						icone: "✅",
+						titulo: "Pedido no Ar",
+						mensagem: `Música do ouvinte colocada no ar com sucesso:\n"${tituloMusica}"\nPedido por: ${nomeOuvinte}`,
+					});
+					setTimeout(monitorarMusicaNoAr, 600);
 				} else {
 					const textoProx = `${tituloMusica} (${nomeOuvinte})`;
 					proximaNomeServidorRef.current = textoProx;
@@ -1359,13 +1360,23 @@ export const useLocutorMesa = () => {
 			try {
 				const data = await scheduleNextTrack(idParaEnviar, {
 					ignorarPedido: true,
+					tocarAgora,
 				});
-				if (data?.sucesso) {
+				if (data?.sucesso || data?.faixa_atual) {
 					temAgendamentoExplicitoRef.current = true;
 					proximaNomeServidorRef.current = data.proxima || nomeFaixa;
 
 					if (tocarAgora) {
-						await transicaoSuaveProxima();
+						if (data?.faixa_atual) {
+							aplicarDadosSyncNaMesa(data);
+						}
+						await updateMesa({ musica_tocando: true, forcar_troca: Date.now() }).catch(() => {});
+						setAvisoModal({
+							icone: "✅",
+							titulo: "Música no Ar",
+							mensagem: `Música colocada no ar com sucesso:\n"${nomeFaixa}"`,
+						});
+						setTimeout(monitorarMusicaNoAr, 600);
 					} else {
 						setProximaAtual(`A seguir (Agendada): ${nomeFaixa}`);
 						updateMesa({ atualizacao_programacao: Date.now() }).catch(() => {});

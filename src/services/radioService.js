@@ -273,7 +273,7 @@ export const rebuildRadioCache = async () => {
  */
 export const scheduleNextTrack = async (
 	trackIdentifier,
-	{ ignorarPedido = false } = {},
+	{ ignorarPedido = false, tocarAgora = false } = {},
 ) => {
 	const params = {
 		agendar_proxima: trackIdentifier,
@@ -281,6 +281,10 @@ export const scheduleNextTrack = async (
 	};
 	if (ignorarPedido) {
 		params.ignorar_pedido = "1";
+	}
+	if (tocarAgora) {
+		params.tocar_agora = "1";
+		params.forcar_proxima = "1";
 	}
 
 	const { data } = await api.get("/radio_sync.php", { params });
