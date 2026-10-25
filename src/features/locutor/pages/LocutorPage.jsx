@@ -302,11 +302,13 @@ const LocutorPage = () => {
 							className={styles.infoCanalMusica}
 							title={
 								vinhetaSelecionada
-									? `Selecionada: ${vinhetaSelecionada.nome}`
-									: "Nenhuma vinheta no cache (PRÉ-ESCUTA)"
+									? `CH-3: ${vinhetaSelecionada.nome} (PAUSADA - Aguardando OUVIR ou AR)`
+									: "Nenhuma vinheta carregada no CH-3"
 							}
 						>
-							{vinhetaSelecionada ? vinhetaSelecionada.nome : "PRÉ-ESCUTA"}
+							{vinhetaSelecionada
+								? `⏸ ${vinhetaSelecionada.nome}`
+								: "PAUSADA (CH-3)"}
 						</div>
 						<div className={styles.botoesCanalVinheta}>
 							<button
@@ -319,8 +321,8 @@ const LocutorPage = () => {
 								disabled={!vinhetaSelecionada && !ouvindoVinheta}
 								title={
 									vinhetaSelecionada
-										? "Ouvir / Parar vinheta apenas para o locutor (CH-3)"
-										: "Nenhuma vinheta no cache. Escolha uma nas pastas abaixo."
+										? "Apenas ouvir na mesa / retorno de fone (CH-3)"
+										: "Nenhuma vinheta carregada. Escolha uma nas pastas abaixo."
 								}
 							>
 								<span>{ouvindoVinheta ? "⏹" : "🎧"}</span>
@@ -338,8 +340,8 @@ const LocutorPage = () => {
 								disabled={!vinhetaSelecionada && !vinhetaNoArId}
 								title={
 									vinhetaSelecionada
-										? "Liberar vinheta selecionada para o AR"
-										: "Nenhuma vinheta no cache. Escolha uma nas pastas abaixo."
+										? "Mandar vinheta pro AR no CH-3 (sem pausar a música)"
+										: "Nenhuma vinheta carregada. Escolha uma nas pastas abaixo."
 								}
 							>
 								<span>📡</span>
