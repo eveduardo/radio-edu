@@ -49,6 +49,7 @@ const LocutorPage = () => {
 		ouvirVinhetaNoCanal,
 		pararEscutaVinheta,
 		liberarVinhetaNoAr,
+		pararVinhetaNoAr,
 		monitorarMusicaNoAr,
 		transicaoSuaveProxima,
 		carregarPedidos,
@@ -281,7 +282,7 @@ const LocutorPage = () => {
 						<div className={styles.faderComVuRow}>
 							<VerticalVuMeter
 								mode="vinheta"
-								aoVivo={ouvindoVinheta}
+								aoVivo={ouvindoVinheta || Boolean(vinhetaNoArId)}
 								faderValue={faderVinheta}
 							/>
 							<div className={styles.faderSlot}>
@@ -306,9 +307,13 @@ const LocutorPage = () => {
 									: "Nenhuma vinheta carregada no CH-3"
 							}
 						>
-							{vinhetaSelecionada
-								? `⏸ ${vinhetaSelecionada.nome}`
-								: "PAUSADA (CH-3)"}
+							{vinhetaNoArId && vinhetaSelecionada
+								? `🔴 ${vinhetaSelecionada.nome}`
+								: ouvindoVinheta && vinhetaSelecionada
+									? `🎧 ${vinhetaSelecionada.nome}`
+									: vinhetaSelecionada
+										? `⏸ ${vinhetaSelecionada.nome}`
+										: "PAUSADA (CH-3)"}
 						</div>
 						<div className={styles.botoesCanalVinheta}>
 							<button
@@ -332,25 +337,24 @@ const LocutorPage = () => {
 								type="button"
 								className={clsx(
 									styles.btnCanalVinhetaAr,
-									vinhetaSelecionada &&
-										vinhetaNoArId === vinhetaSelecionada.id &&
-										styles.ativo,
+									vinhetaNoArId && styles.ativo,
 								)}
-								onClick={() => liberarVinhetaNoAr()}
+								onClick={() =>
+									vinhetaNoArId
+										? pararVinhetaNoAr(true)
+										: liberarVinhetaNoAr()
+								}
 								disabled={!vinhetaSelecionada && !vinhetaNoArId}
 								title={
-									vinhetaSelecionada
-										? "Mandar vinheta pro AR no CH-3 (sem pausar a música)"
-										: "Nenhuma vinheta carregada. Escolha uma nas pastas abaixo."
+									vinhetaNoArId
+										? "Interromper vinheta que está no ar"
+										: vinhetaSelecionada
+											? "Mandar vinheta pro AR no CH-3 (sem pausar a música)"
+											: "Nenhuma vinheta carregada. Escolha uma nas pastas abaixo."
 								}
 							>
-								<span>📡</span>
-								<span>
-									{vinhetaSelecionada &&
-									vinhetaNoArId === vinhetaSelecionada.id
-										? "NO AR!"
-										: "AR"}
-								</span>
+								<span>{vinhetaNoArId ? "🔴" : "📡"}</span>
+								<span>{vinhetaNoArId ? "NO AR!" : "AR"}</span>
 							</button>
 						</div>
 					</div>
@@ -934,69 +938,53 @@ const LocutorPage = () => {
 							</div>
 						) : (
 							vinhetasDaCategoriaFiltradas.map((v) => {
-								const estaOuvindoEsta =
-									ouvindoVinheta && vinhetaSelecionada?.id === v.id;
-								const estaNoArEsta = vinhetaNoArId === v.id;
+								const estaCarregada =
+									vinhetaSelecionada?.id === v.id ||
+									vinhetaSelecionada?.arquivo === v.arquivo;
 								return (
 									<div
 										key={v.id || v.arquivo || v.nome}
 										className={styles.itemMusicaLinha}
+										style={
+											estaCarregada
+												? {
+														borderLeft: "3px solid #38bdf8",
+														background: "#1e293b",
+													}
+												: undefined
+										}
 									>
 										<span
 											className={styles.itemMusicaTitulo}
 											style={{ cursor: "pointer" }}
 											onClick={() => {
-												setVinhetaCategoriaAtiva(null);
 												carregarVinhetaNoCanal(v);
+												setVinhetaCategoriaAtiva(null);
 											}}
-											title="Clique para carregar no canal 3 (CH-3) em pré-escuta"
+											title="Clique para carregar no canal 3 (CH-3) pausada"
 										>
-											📢 {v.nome}
+											📻 {v.nome}
 										</span>
 										<div className={styles.botoesAcaoPedido}>
 											<button
 												type="button"
-												className={styles.btnVinhetaOuvir}
+												className={styles.btnAgendarFaixa}
 												style={{
-													background: "#1e293b",
+													background: "#0284c7",
 													borderColor: "#38bdf8",
-													color: "#38bdf8",
+													color: "#ffffff",
+													fontWeight: 700,
+													padding: "6px 14px",
+													borderRadius: "6px",
+													cursor: "pointer",
 												}}
-												onClick={() => {
-													setVinhetaCategoriaAtiva(null);
-													carregarVinhetaNoCanal(v);
-												}}
-												title="Carregar no canal 3 (CH-3) em pré-escuta"
-											>
-												📥 CH-3
-											</button>
-											<button
-												type="button"
-												className={clsx(
-													styles.btnVinhetaOuvir,
-													estaOuvindoEsta && styles.btnVinhetaOuvirAtivo,
-												)}
 												onClick={() => {
 													carregarVinhetaNoCanal(v);
-													ouvirVinhetaNoCanal(v);
-												}}
-												title="Pré-escutar no canal 3 (CH-3) sem pausar a programação"
-											>
-												{estaOuvindoEsta ? "⏹ Parar" : "🎧 Ouvir"}
-											</button>
-											<button
-												type="button"
-												className={clsx(
-													styles.btnAcervoTocarAgora,
-													estaNoArEsta && styles.btnVinhetaNoArAtivo,
-												)}
-												onClick={() => {
 													setVinhetaCategoriaAtiva(null);
-													liberarVinhetaNoAr(v);
 												}}
-												title="Liberar no AR pelo canal 3 sem pausar o canal 2"
+												title="Carregar esta vinheta no canal 3 (CH-3) pausada"
 											>
-												{estaNoArEsta ? "🔴 No Ar" : "📡 Pro Ar"}
+												✓ Selecionar
 											</button>
 										</div>
 									</div>

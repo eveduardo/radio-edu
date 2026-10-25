@@ -187,7 +187,11 @@ export const useRadioPlayer = () => {
 		const playerVinheta = playerVinhetaRef.current;
 		if (playerVinheta) {
 			try {
-				playerVinheta.volume = volMaster;
+				const volVinhetaMesa =
+					estadoMesa && typeof estadoMesa.vinheta_volume === "number"
+						? Math.max(0, Math.min(1, estadoMesa.vinheta_volume))
+						: 1.0;
+				playerVinheta.volume = Math.max(0, Math.min(1, volMaster * volVinhetaMesa));
 			} catch {
 				// Ignora erro em dispositivos com volume fixo
 			}
@@ -1140,6 +1144,7 @@ export const useRadioPlayer = () => {
 					playerVinheta?.pause();
 					playerVoz?.pause();
 					if (
+						!dados.vinheta_ativa?.manter_musica &&
 						estaTocandoRef.current &&
 						deckAtivo &&
 						deckAtivo.paused &&
@@ -1230,9 +1235,10 @@ export const useRadioPlayer = () => {
 							playerVinheta.play().catch(tocarVozIa);
 						}
 					} else if (playerVinheta && urlVinheta && estaTocandoRef.current) {
-						// Vinheta normal sem prefixo
+						// Vinheta normal sem prefixo (locutor controla faders manualmente)
 						vinhetaEmExecucaoRef.current = true;
-						if (deckAtivo && !deckAtivo.paused) {
+						const manterMusica = Boolean(dados.vinheta_ativa?.manter_musica);
+						if (!manterMusica && deckAtivo && !deckAtivo.paused) {
 							deckAtivo.pause();
 						}
 						playerVinheta.src = urlVinheta;
@@ -1242,6 +1248,7 @@ export const useRadioPlayer = () => {
 							vinhetaEmExecucaoRef.current = false;
 							aplicarVolumesMesa();
 							if (
+								!manterMusica &&
 								estaTocandoRef.current &&
 								deckAtivo &&
 								deckAtivo.paused &&

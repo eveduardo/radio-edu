@@ -838,6 +838,20 @@ export const useLocutorMesa = () => {
 
 	const carregarVinhetaNoCanal = useCallback((vinheta) => {
 		if (!vinheta) return;
+		if (ouvindoVinhetaRef.current) {
+			const audio = vinhetaPreviewAudioRef.current;
+			if (audio) {
+				try {
+					audio.pause();
+					audio.currentTime = 0;
+					audio.src = "";
+				} catch {
+					// ignore
+				}
+			}
+			ouvindoVinhetaRef.current = false;
+			setOuvindoVinheta(false);
+		}
 		vinhetaSelecionadaRef.current = vinheta;
 		setVinhetaSelecionada(vinheta);
 	}, []);
@@ -894,152 +908,179 @@ export const useLocutorMesa = () => {
 		}
 	}, [ouvirVinhetaNoCanal, pararEscutaVinheta]);
 
-	const iniciarCronometroVinhetaNoAr = useCallback((alvo, urlVinheta) => {
-		if (vinhetaTimerIntervalRef.current) {
-			clearInterval(vinhetaTimerIntervalRef.current);
-			vinhetaTimerIntervalRef.current = null;
-		}
+	const pararVinhetaNoAr = useCallback(
+		async (notificarMesa = true) => {
+			if (vinhetaTimerIntervalRef.current) {
+				clearInterval(vinhetaTimerIntervalRef.current);
+				vinhetaTimerIntervalRef.current = null;
+			}
+			setVinhetaNoArId(null);
+			setVinhetaNoArNome("");
+			setTempoRestanteVinhetaSeg(0);
 
-		const inicioMs = Date.now();
-		let duracaoSeg = 10;
+			const audio = vinhetaPreviewAudioRef.current;
+			if (audio) {
+				try {
+					audio.pause();
+					audio.currentTime = 0;
+					audio.src = "";
+				} catch {
+					// ignore
+				}
+			}
 
-		const previewAudio = vinhetaPreviewAudioRef.current;
-		if (
-			previewAudio &&
-			previewAudio.src &&
-			urlVinheta &&
-			previewAudio.src.includes(urlVinheta.split("/").pop()) &&
-			Number.isFinite(previewAudio.duration) &&
-			previewAudio.duration > 0
-		) {
-			duracaoSeg = Math.max(1, Math.ceil(previewAudio.duration));
-		}
+			if (notificarMesa) {
+				try {
+					await updateMesa({
+						ao_vivo: aoVivoRef.current,
+						mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
+						musica_tocando: !musicaPausadaRef.current,
+						musica_volume: faderMusicaRef.current,
+						vinheta_volume: faderVinhetaRef.current,
+						vinheta_ativa: {
+							acao: "parar",
+							manter_musica: true,
+							timestamp: Date.now(),
+						},
+					});
+				} catch {
+					// ignore
+				}
+			}
+		},
+		[],
+	);
 
-		fimVinhetaNoArMsRef.current = inicioMs + duracaoSeg * 1000;
-		setVinhetaNoArId(alvo.id);
-		setVinhetaNoArNome(alvo.nome || "Vinheta");
-		setTempoRestanteVinhetaSeg(duracaoSeg);
+	const iniciarCronometroVinhetaNoAr = useCallback(
+		(alvo, urlVinheta) => {
+			if (vinhetaTimerIntervalRef.current) {
+				clearInterval(vinhetaTimerIntervalRef.current);
+				vinhetaTimerIntervalRef.current = null;
+			}
 
-		if (alvo.prefixo) {
-			const probePrefixo = new Audio();
-			probePrefixo.preload = "metadata";
-			probePrefixo.muted = true;
-			probePrefixo.src = resolveRadioAssetUrl(alvo.prefixo);
+			const inicioMs = Date.now();
+			let duracaoSeg = 10;
 
-			const probeIa = new Audio();
-			probeIa.preload = "metadata";
-			probeIa.muted = true;
-			probeIa.src = urlVinheta;
+			const previewAudio = vinhetaPreviewAudioRef.current;
+			if (
+				previewAudio &&
+				previewAudio.src &&
+				urlVinheta &&
+				previewAudio.src.includes(urlVinheta.split("/").pop()) &&
+				Number.isFinite(previewAudio.duration) &&
+				previewAudio.duration > 0
+			) {
+				duracaoSeg = Math.max(1, Math.ceil(previewAudio.duration));
+			}
 
-			let durPrefixo = 8.0;
-			let durIa = alvo?.texto_falado?.length
-				? Math.max(10.0, Math.ceil(alvo.texto_falado.length / 10))
-				: 15.0;
+			fimVinhetaNoArMsRef.current = inicioMs + duracaoSeg * 1000;
+			setVinhetaNoArId(alvo.id || alvo.arquivo || "vinheta");
+			setVinhetaNoArNome(alvo.nome || "Vinheta");
+			setTempoRestanteVinhetaSeg(duracaoSeg);
 
-			const recalcular = () => {
-				const totalSeg = Math.max(5, Math.ceil(durPrefixo + durIa - 0.8));
-				fimVinhetaNoArMsRef.current = inicioMs + totalSeg * 1000;
-				setTempoRestanteVinhetaSeg(
-					Math.max(0, Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000)),
+			if (alvo.prefixo) {
+				const probePrefixo = new Audio();
+				probePrefixo.preload = "metadata";
+				probePrefixo.muted = true;
+				probePrefixo.src = resolveRadioAssetUrl(alvo.prefixo);
+
+				const probeIa = new Audio();
+				probeIa.preload = "metadata";
+				probeIa.muted = true;
+				probeIa.src = urlVinheta;
+
+				let durPrefixo = 8.0;
+				let durIa = alvo?.texto_falado?.length
+					? Math.max(10.0, Math.ceil(alvo.texto_falado.length / 10))
+					: 15.0;
+
+				const recalcular = () => {
+					const totalSeg = Math.max(5, Math.ceil(durPrefixo + durIa - 0.8));
+					fimVinhetaNoArMsRef.current = inicioMs + totalSeg * 1000;
+					setTempoRestanteVinhetaSeg(
+						Math.max(0, Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000)),
+					);
+				};
+
+				probePrefixo.addEventListener(
+					"loadedmetadata",
+					() => {
+						if (Number.isFinite(probePrefixo.duration) && probePrefixo.duration > 0) {
+							durPrefixo = probePrefixo.duration;
+							recalcular();
+						}
+					},
+					{ once: true },
 				);
-			};
 
-			probePrefixo.addEventListener(
-				"loadedmetadata",
-				() => {
-					if (Number.isFinite(probePrefixo.duration) && probePrefixo.duration > 0) {
-						durPrefixo = probePrefixo.duration;
-						recalcular();
-					}
-				},
-				{ once: true },
-			);
+				probeIa.addEventListener(
+					"loadedmetadata",
+					() => {
+						if (Number.isFinite(probeIa.duration) && probeIa.duration > 0) {
+							durIa = probeIa.duration;
+							recalcular();
+						}
+					},
+					{ once: true },
+				);
 
-			probeIa.addEventListener(
-				"loadedmetadata",
-				() => {
-					if (Number.isFinite(probeIa.duration) && probeIa.duration > 0) {
-						durIa = probeIa.duration;
-						recalcular();
-					}
-				},
-				{ once: true },
-			);
-
-			try {
-				probePrefixo.load();
-				probeIa.load();
-			} catch {
-				// ignore
-			}
-			recalcular();
-		} else if (urlVinheta) {
-			const probe = new Audio();
-			probe.preload = "metadata";
-			probe.muted = true;
-			probe.src = urlVinheta;
-			probe.addEventListener(
-				"loadedmetadata",
-				() => {
-					if (Number.isFinite(probe.duration) && probe.duration > 0) {
-						const durRealMs = Math.ceil(probe.duration * 1000);
-						fimVinhetaNoArMsRef.current = inicioMs + durRealMs;
-						const rest = Math.max(
-							0,
-							Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000),
-						);
-						setTempoRestanteVinhetaSeg(rest);
-					}
-				},
-				{ once: true },
-			);
-			try {
-				probe.load();
-			} catch {
-				// ignore
-			}
-		}
-
-		vinhetaTimerIntervalRef.current = setInterval(() => {
-			const restante = Math.max(
-				0,
-				Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000),
-			);
-			setTempoRestanteVinhetaSeg(restante);
-
-			if (restante <= 0) {
-				if (vinhetaTimerIntervalRef.current) {
-					clearInterval(vinhetaTimerIntervalRef.current);
-					vinhetaTimerIntervalRef.current = null;
+				try {
+					probePrefixo.load();
+					probeIa.load();
+				} catch {
+					// ignore
 				}
-				setVinhetaNoArId(null);
-				setVinhetaNoArNome("");
-				setTempoRestanteVinhetaSeg(0);
-				vinhetaSelecionadaRef.current = null;
-				setVinhetaSelecionada(null);
-
-				// Ao término da vinheta/prefixo, mantém a música tocando
-				musicaPausadaPorVinhetaRef.current = false;
-
-				const arqTemp =
-					alvo?.excluirAposTocar || alvo?.arquivo?.includes("temp_")
-						? alvo.arquivo
-						: null;
-				if (arqTemp) {
-					setRadioMusicPaused(false, { excluirTemp: arqTemp }).catch(() => {});
+				recalcular();
+			} else if (urlVinheta) {
+				const probe = new Audio();
+				probe.preload = "metadata";
+				probe.muted = true;
+				probe.src = urlVinheta;
+				probe.addEventListener(
+					"loadedmetadata",
+					() => {
+						if (Number.isFinite(probe.duration) && probe.duration > 0) {
+							const durRealMs = Math.ceil(probe.duration * 1000);
+							fimVinhetaNoArMsRef.current = inicioMs + durRealMs;
+							const rest = Math.max(
+								0,
+								Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000),
+							);
+							setTempoRestanteVinhetaSeg(rest);
+						}
+					},
+					{ once: true },
+				);
+				try {
+					probe.load();
+				} catch {
+					// ignore
 				}
-
-				updateMesa({
-					ao_vivo: aoVivoRef.current,
-					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
-					musica_tocando: true,
-					musica_volume: faderMusicaRef.current,
-					vinheta_volume: faderVinhetaRef.current,
-					vinheta_ativa: { acao: "parar", timestamp: Date.now(), manter_musica: true },
-				}).catch(() => {});
 			}
-		}, 250);
-	}, [aplicarVolumeMonitor]);
+
+			vinhetaTimerIntervalRef.current = setInterval(() => {
+				const restante = Math.max(
+					0,
+					Math.ceil((fimVinhetaNoArMsRef.current - Date.now()) / 1000),
+				);
+				setTempoRestanteVinhetaSeg(restante);
+
+				if (restante <= 0) {
+					pararVinhetaNoAr(true);
+
+					// Exclui temporário se necessário
+					const arqTemp =
+						alvo?.excluirAposTocar || alvo?.arquivo?.includes("temp_")
+							? alvo.arquivo
+							: null;
+					if (arqTemp) {
+						setRadioMusicPaused(false, { excluirTemp: arqTemp }).catch(() => {});
+					}
+				}
+			}, 250);
+		},
+		[pararVinhetaNoAr],
+	);
 
 	useEffect(() => {
 		return () => {
@@ -1051,6 +1092,11 @@ export const useLocutorMesa = () => {
 
 	const liberarVinhetaNoAr = useCallback(
 		async (vinhetaAlvo = null) => {
+			if (vinhetaNoArId) {
+				await pararVinhetaNoAr(true);
+				return;
+			}
+
 			const alvo = vinhetaAlvo || vinhetaSelecionadaRef.current;
 			if (!alvo) {
 				setAvisoModal({
@@ -1066,8 +1112,8 @@ export const useLocutorMesa = () => {
 			if (ouvindoVinhetaRef.current) {
 				const audio = vinhetaPreviewAudioRef.current;
 				if (audio) {
-					audio.pause();
 					try {
+						audio.pause();
 						audio.currentTime = 0;
 						audio.src = "";
 					} catch {
@@ -1083,6 +1129,20 @@ export const useLocutorMesa = () => {
 
 			const urlVinheta = resolveRadioAssetUrl(alvo.url || alvo.arquivo || "");
 
+			// Toca no estúdio do locutor no volume do fader CH-3
+			const previewAudio = vinhetaPreviewAudioRef.current;
+			if (previewAudio && urlVinheta) {
+				try {
+					previewAudio.src = urlVinheta;
+					aplicarVolumeVinhetaPreview(faderVinhetaRef.current);
+					previewAudio.onended = () => pararVinhetaNoAr(true);
+					previewAudio.onerror = () => pararVinhetaNoAr(true);
+					previewAudio.play().catch(() => {});
+				} catch {
+					// ignore
+				}
+			}
+
 			// Não pausa a música no canal 2 (locutor manipula os faders manualmente)
 			musicaPausadaPorVinhetaRef.current = false;
 
@@ -1090,7 +1150,7 @@ export const useLocutorMesa = () => {
 				await updateMesa({
 					ao_vivo: aoVivoRef.current,
 					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
-					musica_tocando: true, // MÚSICA SEGUE TOCANDO NORMALMENTE
+					musica_tocando: !musicaPausadaRef.current, // MÚSICA SEGUE A DECISÃO MANUAL DO LOCUTOR
 					musica_volume: faderMusicaRef.current,
 					vinheta_volume: faderVinhetaRef.current,
 					vinheta_ativa: {
@@ -1114,7 +1174,12 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[iniciarCronometroVinhetaNoAr],
+		[
+			aplicarVolumeVinhetaPreview,
+			iniciarCronometroVinhetaNoAr,
+			pararVinhetaNoAr,
+			vinhetaNoArId,
+		],
 	);
 	liberarVinhetaNoArRef.current = liberarVinhetaNoAr;
 
@@ -1460,6 +1525,7 @@ export const useLocutorMesa = () => {
 		ouvirVinhetaNoCanal,
 		pararEscutaVinheta,
 		liberarVinhetaNoAr,
+		pararVinhetaNoAr,
 		monitorarMusicaNoAr,
 		transicaoSuaveProxima,
 		carregarPedidos,
