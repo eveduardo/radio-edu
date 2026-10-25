@@ -833,8 +833,13 @@ export const useLocutorMesa = () => {
 		}
 		ouvindoVinhetaRef.current = false;
 		setOuvindoVinheta(false);
-		vinhetaSelecionadaRef.current = null;
-		setVinhetaSelecionada(null);
+		// Mantém vinhetaSelecionada no CH-3 para o locutor poder dar AR ou ouvir novamente
+	}, []);
+
+	const carregarVinhetaNoCanal = useCallback((vinheta) => {
+		if (!vinheta) return;
+		vinhetaSelecionadaRef.current = vinheta;
+		setVinhetaSelecionada(vinheta);
 	}, []);
 
 	const ouvirVinhetaNoCanal = useCallback(
@@ -1013,29 +1018,24 @@ export const useLocutorMesa = () => {
 				vinhetaSelecionadaRef.current = null;
 				setVinhetaSelecionada(null);
 
-				// Ao término da vinheta/prefixo, dá o play novamente na música
+				// Ao término da vinheta/prefixo, mantém a música tocando
 				musicaPausadaPorVinhetaRef.current = false;
-				musicaPausadaRef.current = false;
-				setMusicaPausada(false);
-
-				const audio = monitorAudioRef.current;
-				if (audio && ouvindoProgramacaoRef.current && audio.src) {
-					aplicarVolumeMonitor(faderMusicaRef.current);
-					audio.play().catch(() => {});
-				}
 
 				const arqTemp =
 					alvo?.excluirAposTocar || alvo?.arquivo?.includes("temp_")
 						? alvo.arquivo
 						: null;
-				setRadioMusicPaused(false, { excluirTemp: arqTemp }).catch(() => {});
+				if (arqTemp) {
+					setRadioMusicPaused(false, { excluirTemp: arqTemp }).catch(() => {});
+				}
 
 				updateMesa({
 					ao_vivo: aoVivoRef.current,
 					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
 					musica_tocando: true,
 					musica_volume: faderMusicaRef.current,
-					vinheta_ativa: { acao: "parar", timestamp: Date.now() },
+					vinheta_volume: faderVinhetaRef.current,
+					vinheta_ativa: { acao: "parar", timestamp: Date.now(), manter_musica: true },
 				}).catch(() => {});
 			}
 		}, 250);
@@ -1083,28 +1083,16 @@ export const useLocutorMesa = () => {
 
 			const urlVinheta = resolveRadioAssetUrl(alvo.url || alvo.arquivo || "");
 
-			// Pausa total da música no ar durante a vinheta (sem mexer no fader)
-			if (!musicaPausadaRef.current) {
-				musicaPausadaPorVinhetaRef.current = true;
-				musicaPausadaRef.current = true;
-				setMusicaPausada(true);
-
-				const audio = monitorAudioRef.current;
-				if (audio) {
-					audio.pause();
-				}
-
-				setRadioMusicPaused(true).catch(() => {});
-			} else {
-				musicaPausadaPorVinhetaRef.current = false;
-			}
+			// Não pausa a música no canal 2 (locutor manipula os faders manualmente)
+			musicaPausadaPorVinhetaRef.current = false;
 
 			try {
 				await updateMesa({
 					ao_vivo: aoVivoRef.current,
 					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
-					musica_tocando: false, // PAUSA TOTAL DA MÚSICA NO AR
+					musica_tocando: true, // MÚSICA SEGUE TOCANDO NORMALMENTE
 					musica_volume: faderMusicaRef.current,
+					vinheta_volume: faderVinhetaRef.current,
 					vinheta_ativa: {
 						arquivo: alvo.arquivo,
 						url: alvo.url || alvo.arquivo,
@@ -1112,6 +1100,7 @@ export const useLocutorMesa = () => {
 						url_prefixo: alvo.url_prefixo || null,
 						nome: alvo.nome,
 						acao: "tocar",
+						manter_musica: true,
 						timestamp: Date.now(),
 					},
 				});
@@ -1467,6 +1456,7 @@ export const useLocutorMesa = () => {
 		alternarPausaMusicaNoAr,
 		alternarEscutaProgramacao,
 		alternarEscutaVinhetaCanal,
+		carregarVinhetaNoCanal,
 		ouvirVinhetaNoCanal,
 		pararEscutaVinheta,
 		liberarVinhetaNoAr,

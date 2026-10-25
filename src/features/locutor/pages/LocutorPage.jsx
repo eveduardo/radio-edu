@@ -45,6 +45,7 @@ const LocutorPage = () => {
 		alternarPausaMusicaNoAr,
 		alternarEscutaProgramacao,
 		alternarEscutaVinhetaCanal,
+		carregarVinhetaNoCanal,
 		ouvirVinhetaNoCanal,
 		pararEscutaVinheta,
 		liberarVinhetaNoAr,
@@ -939,10 +940,34 @@ const LocutorPage = () => {
 										key={v.id || v.arquivo || v.nome}
 										className={styles.itemMusicaLinha}
 									>
-										<span className={styles.itemMusicaTitulo}>
+										<span
+											className={styles.itemMusicaTitulo}
+											style={{ cursor: "pointer" }}
+											onClick={() => {
+												setVinhetaCategoriaAtiva(null);
+												carregarVinhetaNoCanal(v);
+											}}
+											title="Clique para carregar no canal 3 (CH-3) em pré-escuta"
+										>
 											📢 {v.nome}
 										</span>
 										<div className={styles.botoesAcaoPedido}>
+											<button
+												type="button"
+												className={styles.btnVinhetaOuvir}
+												style={{
+													background: "#1e293b",
+													borderColor: "#38bdf8",
+													color: "#38bdf8",
+												}}
+												onClick={() => {
+													setVinhetaCategoriaAtiva(null);
+													carregarVinhetaNoCanal(v);
+												}}
+												title="Carregar no canal 3 (CH-3) em pré-escuta"
+											>
+												📥 CH-3
+											</button>
 											<button
 												type="button"
 												className={clsx(
@@ -950,12 +975,12 @@ const LocutorPage = () => {
 													estaOuvindoEsta && styles.btnVinhetaOuvirAtivo,
 												)}
 												onClick={() => {
-													setVinhetaCategoriaAtiva(null);
+													carregarVinhetaNoCanal(v);
 													ouvirVinhetaNoCanal(v);
 												}}
-												title="Pré-escutar apenas para o locutor (CH-3)"
+												title="Pré-escutar no canal 3 (CH-3) sem pausar a programação"
 											>
-												{estaOuvindoEsta ? "⏹ Parar (CH-3)" : "🎧 Ouvir (CH-3)"}
+												{estaOuvindoEsta ? "⏹ Parar" : "🎧 Ouvir"}
 											</button>
 											<button
 												type="button"
@@ -967,9 +992,9 @@ const LocutorPage = () => {
 													setVinhetaCategoriaAtiva(null);
 													liberarVinhetaNoAr(v);
 												}}
-												title="Liberar esta vinheta imediatamente para o AR"
+												title="Liberar no AR pelo canal 3 sem pausar o canal 2"
 											>
-												{estaNoArEsta ? "📡 No Ar!" : "📡 Pro Ar"}
+												{estaNoArEsta ? "🔴 No Ar" : "📡 Pro Ar"}
 											</button>
 										</div>
 									</div>
