@@ -114,7 +114,19 @@ const LocutorPage = () => {
 		<div className={styles.locutorScreen}>
 			<div className={styles.containerMesa}>
 				<div className={styles.topoMesa}>
-					<h1 className={styles.titulo}>🎙️ MESA MASTER</h1>
+					<h1 className={styles.titulo}>
+						🎙️ MESA MASTER{" "}
+						<span
+							style={{
+								fontSize: "11px",
+								color: "#38bdf8",
+								fontWeight: "normal",
+								marginLeft: "6px",
+							}}
+						>
+							(v2.5)
+						</span>
+					</h1>
 					{programaAtual && (
 						<div
 							className={styles.badgeProgramaMesa}
