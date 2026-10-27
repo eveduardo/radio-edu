@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/radio-api/(.*)", "destination": "https://datasystem-ce.com.br/radio/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
