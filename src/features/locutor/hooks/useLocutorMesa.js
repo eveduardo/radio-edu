@@ -987,6 +987,7 @@ export const useLocutorMesa = () => {
 						musica_tocando: !musicaPausadaRef.current,
 						musica_volume: faderMusicaRef.current,
 						vinheta_volume: faderVinhetaRef.current,
+						timestamp: Date.now() / 1000,
 						vinheta_ativa: {
 							acao: "parar",
 							manter_musica: true,
@@ -1206,6 +1207,7 @@ export const useLocutorMesa = () => {
 					musica_tocando: !musicaPausadaRef.current, // MÚSICA SEGUE A DECISÃO MANUAL DO LOCUTOR
 					musica_volume: faderMusicaRef.current,
 					vinheta_volume: faderVinhetaRef.current,
+					timestamp: Date.now() / 1000,
 					vinheta_ativa: {
 						arquivo: alvo.arquivo,
 						url: alvo.url || alvo.arquivo,

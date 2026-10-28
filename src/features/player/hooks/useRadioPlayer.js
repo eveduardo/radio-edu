@@ -139,9 +139,12 @@ export const useRadioPlayer = () => {
 			// Rampa linear aveludada contínua de 80ms - elimina 100% de estalos, cliques e picotados!
 			try {
 				const agora = ctx.currentTime;
-				const volAtual = gainNodeMusica.gain.value;
-				gainNodeMusica.gain.cancelScheduledValues(agora);
-				gainNodeMusica.gain.setValueAtTime(volAtual, agora);
+				if (typeof gainNodeMusica.gain.cancelAndHoldAtTime === "function") {
+					gainNodeMusica.gain.cancelAndHoldAtTime(agora);
+				} else {
+					gainNodeMusica.gain.cancelScheduledValues(agora);
+					gainNodeMusica.gain.setValueAtTime(gainNodeMusica.gain.value, agora);
+				}
 				gainNodeMusica.gain.linearRampToValueAtTime(volumeFinalMusica, agora + 0.08);
 			} catch {
 				gainNodeMusica.gain.value = volumeFinalMusica;
@@ -1068,16 +1071,23 @@ export const useRadioPlayer = () => {
 		const unsubscribe = subscribeToMesa((dados) => {
 			if (!dados) return;
 
-			// Trava anti-picotamento: descarta pacotes antigos atrasados pela rede
+			// Trava anti-picotamento: descarta pacotes antigos atrasados pela rede (> 2.5s)
+			// NUNCA bloqueia ações críticas como vinhetas, hora certa ou virada de faixa
 			const ts = Number(dados.timestamp) || 0;
-			if (ts > 0) {
-				if (ts < ultimoTimestampMesaRef.current) {
+			const temAcaoCritica = Boolean(dados.vinheta_ativa || dados.forcar_troca || dados.musica_tocando !== undefined);
+			if (!temAcaoCritica && ts > 0) {
+				if (ts < ultimoTimestampMesaRef.current - 2.5) {
 					return;
 				}
+				if (ts > ultimoTimestampMesaRef.current) {
+					ultimoTimestampMesaRef.current = ts;
+				}
+			} else if (ts > ultimoTimestampMesaRef.current) {
 				ultimoTimestampMesaRef.current = ts;
 			}
 
-			estadoMesaRef.current = dados;
+			// Mescla o estado para nunca perder o volume dos canais caso o pacote seja parcial
+			estadoMesaRef.current = { ...estadoMesaRef.current, ...dados };
 
 			if (!emTransicaoSuaveRef.current) {
 				aplicarVolumesMesa();
@@ -1199,7 +1209,8 @@ export const useRadioPlayer = () => {
 						estaTocandoRef.current
 					) {
 						vinhetaEmExecucaoRef.current = true;
-						if (deckAtivo && !deckAtivo.paused) {
+						const manterMusicaPref = Boolean(dados.vinheta_ativa?.manter_musica);
+						if (!manterMusicaPref && deckAtivo && !deckAtivo.paused) {
 							deckAtivo.pause();
 						}
 
