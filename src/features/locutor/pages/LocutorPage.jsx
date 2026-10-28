@@ -144,7 +144,7 @@ const LocutorPage = () => {
 								marginLeft: "6px",
 							}}
 						>
-							(v2.7 - Hora Certa)
+							(v2.7)
 						</span>
 					</h1>
 					{programaAtual && (
@@ -168,7 +168,6 @@ const LocutorPage = () => {
 					>
 						<span className={styles.relogioPonto}>●</span>
 						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
-						<span style={{ fontSize: "9px", background: "#d97706", color: "#fff", padding: "2px 6px", borderRadius: "4px", marginLeft: "6px", fontWeight: 800 }}>⏰ HORA</span>
 					</div>
 					<div
 						className={styles.badgeAudiencia}
