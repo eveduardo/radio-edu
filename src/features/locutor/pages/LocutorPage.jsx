@@ -110,14 +110,18 @@ const LocutorPage = () => {
 		return lista.filter((v) => (v.nome || "").toLowerCase().includes(termo));
 	}, [buscaVinhetaModal, mapaVinhetas, vinhetaCategoriaAtiva]);
 
+	const [gerandoHoraCerta, setGerandoHoraCerta] = useState(false);
+
 	const handleCarregarHoraCerta = useCallback(async () => {
+		setGerandoHoraCerta(true);
 		try {
-			const res = await fetch("https://datasystem-ce.com.br/radio/hora_certa.php?json=1&voz=Ricardo&t=" + Date.now());
+			const res = await fetch("https://datasystem-ce.com.br/radio/hora_certa.php?json=1&gerar=1&voz=Ricardo&t=" + Date.now());
 			const data = await res.json();
 			if (data && data.sucesso) {
-				const urlAudio = data.url.startsWith("http")
-					? data.url
-					: `https://datasystem-ce.com.br/radio/${data.url}`;
+				const arq = data.arquivo || data.url;
+				const urlAudio = arq.startsWith("http")
+					? arq
+					: `https://datasystem-ce.com.br/radio/${arq}`;
 				const itemHora = {
 					id: `hora_${Date.now()}`,
 					nome: `Hora Certa (${data.horario})`,
@@ -127,6 +131,8 @@ const LocutorPage = () => {
 			}
 		} catch (err) {
 			console.error("Erro ao carregar hora certa:", err);
+		} finally {
+			setGerandoHoraCerta(false);
 		}
 	}, [carregarVinhetaNoCanal]);
 
@@ -400,9 +406,10 @@ const LocutorPage = () => {
 								gap: "4px"
 							}}
 							onClick={handleCarregarHoraCerta}
+							disabled={gerandoHoraCerta}
 							title="Carregar a hora certa falada no Canal 3 (CH-3)"
 						>
-							<span>⏰ HORA CERTA</span>
+							<span>{gerandoHoraCerta ? "⏳ GERANDO..." : "⏰ HORA CERTA"}</span>
 						</button>
 					</div>
 				</div>
@@ -434,6 +441,20 @@ const LocutorPage = () => {
 							<span className={styles.badgeTempoRestante}>
 								{tempoRestanteFormatado}
 							</span>
+							<button
+								type="button"
+								className={styles.btnFadeProxima}
+								onClick={handleCarregarHoraCerta}
+								disabled={gerandoHoraCerta}
+								style={{
+									background: "rgba(217, 119, 6, 0.2)",
+									borderColor: "#d97706",
+									color: "#fbbf24",
+								}}
+								title="Carregar a hora certa falada no Canal 3 (CH-3)"
+							>
+								{gerandoHoraCerta ? "⏳ Gerando..." : "⏰ Hora Certa"}
+							</button>
 							<button
 								type="button"
 								className={styles.btnFadeProxima}
