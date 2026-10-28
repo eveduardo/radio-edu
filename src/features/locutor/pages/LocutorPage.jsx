@@ -110,6 +110,26 @@ const LocutorPage = () => {
 		return lista.filter((v) => (v.nome || "").toLowerCase().includes(termo));
 	}, [buscaVinhetaModal, mapaVinhetas, vinhetaCategoriaAtiva]);
 
+	const handleCarregarHoraCerta = useCallback(async () => {
+		try {
+			const res = await fetch("https://datasystem-ce.com.br/radio/hora_certa.php?json=1&t=" + Date.now());
+			const data = await res.json();
+			if (data && data.sucesso) {
+				const urlAudio = data.url.startsWith("http")
+					? data.url
+					: `https://datasystem-ce.com.br/radio/${data.url}`;
+				const itemHora = {
+					id: `hora_${Date.now()}`,
+					nome: `Hora Certa (${data.horario})`,
+					arquivo: urlAudio
+				};
+				carregarVinhetaNoCanal(itemHora);
+			}
+		} catch (err) {
+			console.error("Erro ao carregar hora certa:", err);
+		}
+	}, [carregarVinhetaNoCanal]);
+
 	return (
 		<div className={styles.locutorScreen}>
 			<div className={styles.containerMesa}>
@@ -124,7 +144,7 @@ const LocutorPage = () => {
 								marginLeft: "6px",
 							}}
 						>
-							(v2.5)
+							(v2.7 - Hora Certa)
 						</span>
 					</h1>
 					{programaAtual && (
@@ -140,9 +160,15 @@ const LocutorPage = () => {
 							</span>
 						</div>
 					)}
-					<div className={styles.relogioMesa} title="Horário de Brasília em tempo real">
+					<div
+						className={styles.relogioMesa}
+						onClick={handleCarregarHoraCerta}
+						style={{ cursor: "pointer" }}
+						title="Clique para carregar a Hora Certa falada no CH-3"
+					>
 						<span className={styles.relogioPonto}>●</span>
 						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
+						<span style={{ fontSize: "9px", background: "#d97706", color: "#fff", padding: "2px 6px", borderRadius: "4px", marginLeft: "6px", fontWeight: 800 }}>⏰ HORA</span>
 					</div>
 					<div
 						className={styles.badgeAudiencia}
@@ -369,6 +395,29 @@ const LocutorPage = () => {
 								<span>{vinhetaNoArId ? "NO AR!" : "AR"}</span>
 							</button>
 						</div>
+						<button
+							type="button"
+							style={{
+								width: "100%",
+								marginTop: "5px",
+								padding: "6px 2px",
+								fontSize: "10px",
+								background: "linear-gradient(180deg, #d97706 0%, #b45309 100%)",
+								border: "1px solid #f59e0b",
+								color: "#fff",
+								fontWeight: 800,
+								borderRadius: "6px",
+								cursor: "pointer",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								gap: "4px"
+							}}
+							onClick={handleCarregarHoraCerta}
+							title="Carregar a hora certa falada no Canal 3 (CH-3)"
+						>
+							<span>⏰ HORA CERTA</span>
+						</button>
 					</div>
 				</div>
 

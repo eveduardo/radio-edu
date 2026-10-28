@@ -211,7 +211,7 @@ export const useLocutorMesa = () => {
 		if (imediato) {
 			enviar();
 		} else {
-			debounceFirebaseRef.current = setTimeout(enviar, 30);
+			debounceFirebaseRef.current = setTimeout(enviar, 120);
 		}
 	}, []);
 
