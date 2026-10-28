@@ -877,6 +877,19 @@ export const useLocutorMesa = () => {
 		}
 		vinhetaSelecionadaRef.current = vinheta;
 		setVinhetaSelecionada(vinheta);
+
+		// Pré-carrega o áudio imediatamente no navegador para disparo instantâneo ao clicar em AR
+		const url = resolveRadioAssetUrl(vinheta.url || vinheta.arquivo || "");
+		const audio = vinhetaPreviewAudioRef.current;
+		if (audio && url) {
+			try {
+				audio.src = url;
+				audio.preload = "auto";
+				audio.load();
+			} catch {
+				// ignore
+			}
+		}
 	}, []);
 
 	const ouvirVinhetaNoCanal = useCallback(
@@ -1169,8 +1182,11 @@ export const useLocutorMesa = () => {
 			// Não pausa a música no canal 2 (locutor manipula os faders manualmente)
 			musicaPausadaPorVinhetaRef.current = false;
 
+			// Resposta visual e cronômetro INSTANTÂNEOS no clique (0ms de atraso)
+			iniciarCronometroVinhetaNoAr(alvo, urlVinheta);
+
 			try {
-				await updateMesa({
+				updateMesa({
 					ao_vivo: aoVivoRef.current,
 					mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
 					musica_tocando: !musicaPausadaRef.current, // MÚSICA SEGUE A DECISÃO MANUAL DO LOCUTOR
@@ -1186,9 +1202,7 @@ export const useLocutorMesa = () => {
 						manter_musica: true,
 						timestamp: Date.now(),
 					},
-				});
-
-				iniciarCronometroVinhetaNoAr(alvo, urlVinheta);
+				}).catch(() => {});
 			} catch {
 				setAvisoModal({
 					icone: "⚠️",

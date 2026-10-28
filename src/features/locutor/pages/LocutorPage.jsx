@@ -153,12 +153,7 @@ const LocutorPage = () => {
 							(v2.7)
 						</span>
 					</h1>
-					<div
-						className={styles.relogioMesa}
-						onClick={handleCarregarHoraCerta}
-						style={{ cursor: "pointer" }}
-						title="Clique para carregar a Hora Certa falada no CH-3"
-					>
+					<div className={styles.relogioMesa}>
 						<span className={styles.relogioPonto}>●</span>
 						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
 					</div>
@@ -441,20 +436,6 @@ const LocutorPage = () => {
 							<span className={styles.badgeTempoRestante}>
 								{tempoRestanteFormatado}
 							</span>
-							<button
-								type="button"
-								className={styles.btnFadeProxima}
-								onClick={handleCarregarHoraCerta}
-								disabled={gerandoHoraCerta}
-								style={{
-									background: "rgba(217, 119, 6, 0.2)",
-									borderColor: "#d97706",
-									color: "#fbbf24",
-								}}
-								title="Carregar a hora certa falada no Canal 3 (CH-3)"
-							>
-								{gerandoHoraCerta ? "⏳ Gerando..." : "⏰ Hora Certa"}
-							</button>
 							<button
 								type="button"
 								className={styles.btnFadeProxima}
