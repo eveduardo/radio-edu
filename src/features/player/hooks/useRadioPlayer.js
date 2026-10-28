@@ -107,15 +107,10 @@ export const useRadioPlayer = () => {
 		const estadoMesa = estadoMesaRef.current;
 		const volMaster = Math.max(0, Math.min(1, volumeMasterRef.current));
 
-		let volMusicaMesa =
+		const volMusicaMesa =
 			estadoMesa && typeof estadoMesa.musica_volume === "number"
 				? Math.max(0, Math.min(1, estadoMesa.musica_volume))
 				: 1.0;
-
-		// Auto-Ducking Profissional: se vinheta ou hora certa estiver tocando no ar, atenua para 20%
-		if (vinhetaEmExecucaoRef.current) {
-			volMusicaMesa *= 0.20;
-		}
 
 		const volMicMesa =
 			estadoMesa && typeof estadoMesa.mic_volume === "number"
@@ -141,13 +136,17 @@ export const useRadioPlayer = () => {
 				: playerRef.current;
 
 		if (gainNodeMusica && ctx && ctx.state === "running") {
-			// Rampa aveludada contínua de 80ms - elimina estalos, cliques e picotados!
+			// Rampa linear aveludada contínua de 80ms - elimina 100% de estalos, cliques e picotados!
 			try {
-				gainNodeMusica.gain.setTargetAtTime(volumeFinalMusica, ctx.currentTime, 0.08);
+				const agora = ctx.currentTime;
+				const volAtual = gainNodeMusica.gain.value;
+				gainNodeMusica.gain.cancelScheduledValues(agora);
+				gainNodeMusica.gain.setValueAtTime(volAtual, agora);
+				gainNodeMusica.gain.linearRampToValueAtTime(volumeFinalMusica, agora + 0.08);
 			} catch {
 				gainNodeMusica.gain.value = volumeFinalMusica;
 			}
-			if (deckAtivo && !emTransicaoAntecipadaRef.current) {
+			if (deckAtivo && !emTransicaoAntecipadaRef.current && deckAtivo.volume !== 1.0) {
 				try {
 					deckAtivo.volume = 1.0; // Evita dupla atenuação quando Web Audio está ativo
 				} catch {

@@ -181,7 +181,10 @@ export const useLocutorMesa = () => {
 		const audio = monitorAudioRef.current;
 		if (!audio) return;
 		try {
-			audio.volume = Math.max(0, Math.min(1, vol));
+			const clamped = Math.max(0, Math.min(1, vol));
+			if (Math.abs(audio.volume - clamped) > 0.02) {
+				audio.volume = clamped;
+			}
 		} catch {
 			// ignore
 		}
@@ -191,7 +194,10 @@ export const useLocutorMesa = () => {
 		const audio = vinhetaPreviewAudioRef.current;
 		if (!audio) return;
 		try {
-			audio.volume = Math.max(0, Math.min(1, vol));
+			const clamped = Math.max(0, Math.min(1, vol));
+			if (Math.abs(audio.volume - clamped) > 0.02) {
+				audio.volume = clamped;
+			}
 		} catch {
 			// ignore
 		}
@@ -205,18 +211,24 @@ export const useLocutorMesa = () => {
 				mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
 				musica_tocando: !musicaPausadaRef.current,
 				musica_volume: Math.max(0, Math.min(1, faderMusicaRef.current)),
+				vinheta_volume: Math.max(0, Math.min(1, faderVinhetaRef.current)),
 				timestamp: tsAgora,
 			}).catch(() => {});
 		};
 
-		if (debounceFirebaseRef.current) {
-			clearTimeout(debounceFirebaseRef.current);
-		}
-
 		if (imediato) {
+			if (debounceFirebaseRef.current) {
+				clearTimeout(debounceFirebaseRef.current);
+				debounceFirebaseRef.current = null;
+			}
 			enviar();
 		} else {
-			debounceFirebaseRef.current = setTimeout(enviar, 120);
+			if (!debounceFirebaseRef.current) {
+				debounceFirebaseRef.current = setTimeout(() => {
+					debounceFirebaseRef.current = null;
+					enviar();
+				}, 80);
+			}
 		}
 	}, []);
 
