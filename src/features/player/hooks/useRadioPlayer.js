@@ -125,18 +125,6 @@ export const useRadioPlayer = () => {
 
 		const ctx = audioCtxRef.current;
 		const gainNodeMusica = gainNodeMusicaRef.current;
-		if (gainNodeMusica && ctx) {
-			try {
-				if (ctx.state === "running") {
-					gainNodeMusica.gain.setValueAtTime(volumeFinalMusica, ctx.currentTime);
-				} else {
-					gainNodeMusica.gain.value = volumeFinalMusica;
-				}
-			} catch {
-				gainNodeMusica.gain.value = volumeFinalMusica;
-			}
-		}
-
 		const deckAtivo =
 			deckAtivoRef.current === "A"
 				? playerRef.current
@@ -146,13 +134,33 @@ export const useRadioPlayer = () => {
 				? playerDeckBRef.current
 				: playerRef.current;
 
-		if (deckAtivo && !emTransicaoAntecipadaRef.current) {
+		if (gainNodeMusica && ctx && ctx.state === "running") {
+			// Rampa suave exponencial de 40ms - elimina estalos, cliques e picotados!
 			try {
-				deckAtivo.volume = volumeFinalMusica;
+				gainNodeMusica.gain.setTargetAtTime(volumeFinalMusica, ctx.currentTime, 0.04);
 			} catch {
-				// Ignora erro em dispositivos com volume fixo por botões físicos (ex.: iOS)
+				gainNodeMusica.gain.value = volumeFinalMusica;
+			}
+			if (deckAtivo && !emTransicaoAntecipadaRef.current) {
+				try {
+					deckAtivo.volume = 1.0; // Evita dupla atenuação quando Web Audio está ativo
+				} catch {
+					// ignore
+				}
+			}
+		} else {
+			if (gainNodeMusica) {
+				gainNodeMusica.gain.value = volumeFinalMusica;
+			}
+			if (deckAtivo && !emTransicaoAntecipadaRef.current) {
+				try {
+					deckAtivo.volume = volumeFinalMusica;
+				} catch {
+					// Ignora erro em dispositivos com volume fixo por botões físicos (ex.: iOS)
+				}
 			}
 		}
+
 		if (deckOcioso && !emTransicaoAntecipadaRef.current) {
 			try {
 				deckOcioso.volume = 0;
@@ -163,13 +171,17 @@ export const useRadioPlayer = () => {
 
 		const gainNodeVoz = gainNodeVozRef.current;
 		if (gainNodeVoz && ctx && ctx.state === "running") {
-			gainNodeVoz.gain.setValueAtTime(volumeFinalMic, ctx.currentTime);
+			try {
+				gainNodeVoz.gain.setTargetAtTime(volumeFinalMic, ctx.currentTime, 0.04);
+			} catch {
+				gainNodeVoz.gain.value = volumeFinalMic;
+			}
 		}
 
 		const playerVoz = playerVozRef.current;
 		if (playerVoz) {
 			try {
-				playerVoz.volume = volumeFinalMic;
+				playerVoz.volume = (gainNodeVoz && ctx && ctx.state === "running") ? 1.0 : volumeFinalMic;
 			} catch {
 				// Ignora erro em dispositivos com volume fixo
 			}
@@ -356,16 +368,26 @@ export const useRadioPlayer = () => {
 			const ctx = audioCtxRef.current;
 			const gainNodeMusica = gainNodeMusicaRef.current;
 			if (gainNodeMusica && ctx && ctx.state === "running") {
-				gainNodeMusica.gain.setValueAtTime(
-					0.2 * volumeMasterRef.current,
-					ctx.currentTime,
-				);
-			}
-			if (playerRef.current) {
 				try {
-					playerRef.current.volume = 0.2 * volumeMasterRef.current;
+					gainNodeMusica.gain.setTargetAtTime(
+						0.25 * volumeMasterRef.current,
+						ctx.currentTime,
+						0.06,
+					);
 				} catch {
-					// ignore
+					gainNodeMusica.gain.value = 0.25 * volumeMasterRef.current;
+				}
+			} else {
+				const deckAtual =
+					deckAtivoRef.current === "A"
+						? playerRef.current
+						: playerDeckBRef.current;
+				if (deckAtual && !emTransicaoAntecipadaRef.current) {
+					try {
+						deckAtual.volume = 0.25 * volumeMasterRef.current;
+					} catch {
+						// ignore
+					}
 				}
 			}
 
@@ -577,7 +599,7 @@ export const useRadioPlayer = () => {
 					deckAtivo.readyState >= 2 &&
 					!novaUrl.includes("temp_trinca") &&
 					!novaUrl.includes("hora_certa") &&
-					Math.abs(deckAtivo.currentTime - offsetExato) > 8
+					Math.abs(deckAtivo.currentTime - offsetExato) > 25
 				) {
 					try {
 						deckAtivo.currentTime = offsetExato;

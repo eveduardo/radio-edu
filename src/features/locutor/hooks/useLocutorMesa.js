@@ -174,6 +174,7 @@ export const useLocutorMesa = () => {
 	const offsetAtualRef = useRef(0);
 	const baseOffsetRef = useRef(0);
 	const timestampSyncRef = useRef(Date.now());
+	const viradaConsultadaRef = useRef(false);
 	const acervoMusicasGlobalRef = useRef([]);
 
 	const aplicarVolumeMonitor = useCallback((vol) => {
@@ -551,6 +552,9 @@ export const useLocutorMesa = () => {
 				if (novaUrl) {
 					const trocouFaixa = urlFaixaNoArRef.current !== novaUrl;
 					urlFaixaNoArRef.current = novaUrl;
+					if (trocouFaixa) {
+						viradaConsultadaRef.current = false;
+					}
 
 					if (ouvindoProgramacaoRef.current && audio) {
 						if (trocouFaixa || !audio.src || audio.paused) {
@@ -582,7 +586,7 @@ export const useLocutorMesa = () => {
 							audio.pause();
 						} else if (
 							audio.readyState >= 2 &&
-							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 4
+							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 25
 						) {
 							try {
 								audio.currentTime = Math.max(0, data.offset_segundos || 0);
@@ -665,8 +669,8 @@ export const useLocutorMesa = () => {
 
 	useEffect(() => {
 		monitorarMusicaNoAr();
-		// Consulta contínua da mesa: a cada 3 segundos (ao invés de 15 segundos)
-		const syncInterval = setInterval(monitorarMusicaNoAr, 3000);
+		// Consulta contínua da mesa: a cada 5 segundos
+		const syncInterval = setInterval(monitorarMusicaNoAr, 5000);
 
 		const checarAudiencia = async () => {
 			try {
@@ -699,8 +703,9 @@ export const useLocutorMesa = () => {
 			);
 			setTempoRestanteSeg(restante);
 
-			// Quando faltar <= 1s (momento que os ouvintes entram em crossfade), consulta imediatamente o servidor
-			if (restante <= 1) {
+			// Quando faltar <= 1s, consulta uma única vez o servidor para virar a faixa sem spam
+			if (restante <= 1 && !viradaConsultadaRef.current && !musicaPausadaRef.current) {
+				viradaConsultadaRef.current = true;
 				monitorarMusicaNoAr();
 			}
 		}, 1000);
