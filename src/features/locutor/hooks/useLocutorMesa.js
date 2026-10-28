@@ -172,6 +172,8 @@ export const useLocutorMesa = () => {
 
 	const duracaoAtualRef = useRef(0);
 	const offsetAtualRef = useRef(0);
+	const baseOffsetRef = useRef(0);
+	const timestampSyncRef = useRef(Date.now());
 	const acervoMusicasGlobalRef = useRef([]);
 
 	const aplicarVolumeMonitor = useCallback((vol) => {
@@ -500,7 +502,9 @@ export const useLocutorMesa = () => {
 				proximaNomeServidorRef.current = nomeProx;
 				setProximaAtual(`A seguir: ${nomeProx || "--"}`);
 				duracaoAtualRef.current = data.faixa_atual.duracao || 180;
-				offsetAtualRef.current = data.offset_segundos || 0;
+				baseOffsetRef.current = data.offset_segundos || 0;
+				timestampSyncRef.current = Date.now();
+				offsetAtualRef.current = baseOffsetRef.current;
 				setTempoRestanteSeg(
 					Math.max(0, duracaoAtualRef.current - offsetAtualRef.current),
 				);
@@ -661,7 +665,8 @@ export const useLocutorMesa = () => {
 
 	useEffect(() => {
 		monitorarMusicaNoAr();
-		const syncInterval = setInterval(monitorarMusicaNoAr, 15000);
+		// Consulta contínua da mesa: a cada 3 segundos (ao invés de 15 segundos)
+		const syncInterval = setInterval(monitorarMusicaNoAr, 3000);
 
 		const checarAudiencia = async () => {
 			try {
@@ -683,22 +688,35 @@ export const useLocutorMesa = () => {
 		const countdownInterval = setInterval(() => {
 			if (musicaPausadaRef.current) return;
 
-			offsetAtualRef.current += 1;
+			const decorridoLocal = Math.floor(
+				(Date.now() - timestampSyncRef.current) / 1000,
+			);
+			const offsetReal = baseOffsetRef.current + decorridoLocal;
+			offsetAtualRef.current = offsetReal;
 			const restante = Math.max(
 				0,
-				duracaoAtualRef.current - offsetAtualRef.current,
+				duracaoAtualRef.current - offsetReal,
 			);
 			setTempoRestanteSeg(restante);
 
-			if (restante === 0) {
-				setTimeout(monitorarMusicaNoAr, 1200);
+			// Quando faltar <= 1s (momento que os ouvintes entram em crossfade), consulta imediatamente o servidor
+			if (restante <= 1) {
+				monitorarMusicaNoAr();
 			}
 		}, 1000);
+
+		const onVisibility = () => {
+			if (!document.hidden) {
+				monitorarMusicaNoAr();
+			}
+		};
+		document.addEventListener("visibilitychange", onVisibility);
 
 		return () => {
 			clearInterval(syncInterval);
 			clearInterval(audInterval);
 			clearInterval(countdownInterval);
+			document.removeEventListener("visibilitychange", onVisibility);
 		};
 	}, [monitorarMusicaNoAr]);
 
