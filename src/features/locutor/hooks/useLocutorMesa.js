@@ -199,11 +199,13 @@ export const useLocutorMesa = () => {
 
 	const sincronizarMesaFirebase = useCallback((imediato = false) => {
 		const enviar = () => {
+			const tsAgora = Date.now() / 1000;
 			updateMesa({
 				ao_vivo: aoVivoRef.current,
 				mic_volume: Math.max(0, Math.min(1, faderMicRef.current)),
 				musica_tocando: !musicaPausadaRef.current,
 				musica_volume: Math.max(0, Math.min(1, faderMusicaRef.current)),
+				timestamp: tsAgora,
 			}).catch(() => {});
 		};
 

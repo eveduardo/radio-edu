@@ -86,6 +86,7 @@ export const useRadioPlayer = () => {
 	const tocandoVozRef = useRef(false);
 	const historicoChunksRef = useRef(new Set());
 	const ultimaVinhetaTocadaRef = useRef(0);
+	const ultimoTimestampMesaRef = useRef(0);
 	const primeiraCargaFirebaseRef = useRef(true);
 	const ultimaTrocaForcadaRef = useRef(0);
 	const faixaRecemConcluidaRef = useRef(null);
@@ -106,10 +107,15 @@ export const useRadioPlayer = () => {
 		const estadoMesa = estadoMesaRef.current;
 		const volMaster = Math.max(0, Math.min(1, volumeMasterRef.current));
 
-		const volMusicaMesa =
+		let volMusicaMesa =
 			estadoMesa && typeof estadoMesa.musica_volume === "number"
 				? Math.max(0, Math.min(1, estadoMesa.musica_volume))
 				: 1.0;
+
+		// Auto-Ducking Profissional: se vinheta ou hora certa estiver tocando no ar, atenua para 20%
+		if (vinhetaEmExecucaoRef.current) {
+			volMusicaMesa *= 0.20;
+		}
 
 		const volMicMesa =
 			estadoMesa && typeof estadoMesa.mic_volume === "number"
@@ -135,9 +141,9 @@ export const useRadioPlayer = () => {
 				: playerRef.current;
 
 		if (gainNodeMusica && ctx && ctx.state === "running") {
-			// Rampa suave exponencial de 40ms - elimina estalos, cliques e picotados!
+			// Rampa aveludada contínua de 80ms - elimina estalos, cliques e picotados!
 			try {
-				gainNodeMusica.gain.setTargetAtTime(volumeFinalMusica, ctx.currentTime, 0.04);
+				gainNodeMusica.gain.setTargetAtTime(volumeFinalMusica, ctx.currentTime, 0.08);
 			} catch {
 				gainNodeMusica.gain.value = volumeFinalMusica;
 			}
@@ -1061,6 +1067,17 @@ export const useRadioPlayer = () => {
 	// Assinatura em tempo real do Firebase (nó `mesa`)
 	useEffect(() => {
 		const unsubscribe = subscribeToMesa((dados) => {
+			if (!dados) return;
+
+			// Trava anti-picotamento: descarta pacotes antigos atrasados pela rede
+			const ts = Number(dados.timestamp) || 0;
+			if (ts > 0) {
+				if (ts < ultimoTimestampMesaRef.current) {
+					return;
+				}
+				ultimoTimestampMesaRef.current = ts;
+			}
+
 			estadoMesaRef.current = dados;
 
 			if (!emTransicaoSuaveRef.current) {
