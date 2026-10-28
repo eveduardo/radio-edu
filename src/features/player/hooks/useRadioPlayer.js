@@ -503,7 +503,7 @@ export const useRadioPlayer = () => {
 					aplicarVolumesMesa();
 
 					const posicionarOffset = () => {
-						if (!forcarProxima && offsetExato > 2 && !novaUrl.includes("temp_trinca")) {
+						if (!forcarProxima && offsetExato > 2 && !novaUrl.includes("temp_trinca") && !novaUrl.includes("hora_certa")) {
 							try {
 								deckAtivo.currentTime = offsetExato;
 							} catch {
@@ -576,6 +576,7 @@ export const useRadioPlayer = () => {
 					!deckAtivo.paused &&
 					deckAtivo.readyState >= 2 &&
 					!novaUrl.includes("temp_trinca") &&
+					!novaUrl.includes("hora_certa") &&
 					Math.abs(deckAtivo.currentTime - offsetExato) > 8
 				) {
 					try {
@@ -583,15 +584,6 @@ export const useRadioPlayer = () => {
 					} catch {
 						// ignore
 					}
-				}
-
-				const minutoAgora = new Date().getMinutes();
-				if (
-					(minutoAgora === 0 || minutoAgora === 30) &&
-					data.hora_certa?.arquivo &&
-					ultimaHoraTocadaRef.current !== data.hora_certa.horario
-				) {
-					tocarHoraCerta(data.hora_certa.arquivo, data.hora_certa.horario);
 				}
 
 				return data;
@@ -872,15 +864,17 @@ export const useRadioPlayer = () => {
 				return;
 			}
 
-			// Locuções e vinhetas da IA (como anúncio de trincas) devem falar até a última palavra sem corte de crossfade!
+			// Locuções e vinhetas da IA (como anúncio de trincas e hora certa) devem falar até a última palavra sem corte de crossfade!
 			const eLocucaoAtual =
 				urlFaixaAtualRef.current &&
 				(urlFaixaAtualRef.current.includes("temp_trinca") ||
-					urlFaixaAtualRef.current.includes("vinhetas/"));
+					urlFaixaAtualRef.current.includes("vinhetas/") ||
+					urlFaixaAtualRef.current.includes("hora_certa"));
 			const eLocucaoProxima =
 				proximaUrlRef.current &&
 				(proximaUrlRef.current.includes("temp_trinca") ||
-					proximaUrlRef.current.includes("vinhetas/"));
+					proximaUrlRef.current.includes("vinhetas/") ||
+					proximaUrlRef.current.includes("hora_certa"));
 			if (eLocucaoAtual || eLocucaoProxima) {
 				return;
 			}
