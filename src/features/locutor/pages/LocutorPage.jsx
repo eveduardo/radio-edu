@@ -112,7 +112,7 @@ const LocutorPage = () => {
 
 	const handleCarregarHoraCerta = useCallback(async () => {
 		try {
-			const res = await fetch("https://datasystem-ce.com.br/radio/hora_certa.php?json=1&t=" + Date.now());
+			const res = await fetch("https://datasystem-ce.com.br/radio/hora_certa.php?json=1&voz=Ricardo&t=" + Date.now());
 			const data = await res.json();
 			if (data && data.sucesso) {
 				const urlAudio = data.url.startsWith("http")
