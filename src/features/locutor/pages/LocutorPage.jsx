@@ -147,19 +147,6 @@ const LocutorPage = () => {
 							(v2.7)
 						</span>
 					</h1>
-					{programaAtual && (
-						<div
-							className={styles.badgeProgramaMesa}
-							title={`${programaAtual.nome || "Programa"} (${programaAtual.horario || ""})${programaAtual.slogan ? ` - ${programaAtual.slogan}` : ""}`}
-						>
-							<span className={styles.badgeProgramaIcone}>
-								{programaAtual.icone || "📻"}
-							</span>
-							<span className={styles.badgeProgramaNome}>
-								{programaAtual.nome}
-							</span>
-						</div>
-					)}
 					<div
 						className={styles.relogioMesa}
 						onClick={handleCarregarHoraCerta}
