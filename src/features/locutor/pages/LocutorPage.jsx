@@ -64,6 +64,8 @@ const LocutorPage = () => {
 		blocoTrinca,
 		autoTrincaHabilitado,
 		alternarAutoTrinca,
+		autoRecadosHabilitado,
+		alternarAutoRecados,
 		cancelarIaTrinca,
 	} = useLocutorMesa();
 
@@ -484,6 +486,17 @@ const LocutorPage = () => {
 							/>
 							<span>Locução IA a cada 3 músicas</span>
 						</label>
+						<label
+							className={styles.labelAutoTrinca}
+							title="Lê automaticamente o recado do ouvinte com voz neural de IA assim que a faixa atual terminar"
+						>
+							<input
+								type="checkbox"
+								checked={autoRecadosHabilitado}
+								onChange={(e) => alternarAutoRecados(e.target.checked)}
+							/>
+							<span>Voz IA nos Recados</span>
+						</label>
 					</div>
 				</div>
 
@@ -493,13 +506,29 @@ const LocutorPage = () => {
 					<div className={styles.painelPedidos}>
 						<div className={styles.painelPedidosHeader}>
 							<span>📩 Pedidos dos Ouvintes ({pedidos.length})</span>
-							<button
-								type="button"
-								className={styles.btnRefresh}
-								onClick={carregarPedidos}
-							>
-								↻ Atualizar
-							</button>
+							<div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+								<label
+									className={styles.labelAutoTrinca}
+									style={{ margin: 0, padding: "2px 8px", background: "rgba(56, 189, 248, 0.08)", borderRadius: "6px", border: "1px solid rgba(56, 189, 248, 0.2)" }}
+									title="Liga ou desliga a leitura com Voz IA nos recados dos ouvintes"
+								>
+									<input
+										type="checkbox"
+										checked={autoRecadosHabilitado}
+										onChange={(e) => alternarAutoRecados(e.target.checked)}
+									/>
+									<span style={{ fontSize: "11px", fontWeight: "600", color: autoRecadosHabilitado ? "#38bdf8" : "#94a3b8" }}>
+										🤖 Voz IA {autoRecadosHabilitado ? "LIGADA" : "DESLIGADA"}
+									</span>
+								</label>
+								<button
+									type="button"
+									className={styles.btnRefresh}
+									onClick={carregarPedidos}
+								>
+									↻ Atualizar
+								</button>
+							</div>
 						</div>
 						<div className={styles.areaScrollPedidos}>
 							{pedidos.length === 0 ? (

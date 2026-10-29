@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+	alternarAutoRecadosIa,
 	cancelarTrincaIa,
 	discardNextTrack,
 	fetchGenresCatalog,
@@ -119,6 +120,16 @@ export const useLocutorMesa = () => {
 	const [autoTrincaHabilitado, setAutoTrincaHabilitado] = useState(true);
 	const autoTrincaHabilitadoRef = useRef(true);
 	autoTrincaHabilitadoRef.current = autoTrincaHabilitado;
+
+	const [autoRecadosHabilitado, setAutoRecadosHabilitado] = useState(() => {
+		const salvo =
+			typeof localStorage !== "undefined"
+				? localStorage.getItem("autoRecadosHabilitado")
+				: null;
+		return salvo !== null ? salvo === "true" : true;
+	});
+	const autoRecadosHabilitadoRef = useRef(autoRecadosHabilitado);
+	autoRecadosHabilitadoRef.current = autoRecadosHabilitado;
 	const ultimoAnuncioTrincaRef = useRef("");
 	const liberarVinhetaNoArRef = useRef(null);
 
@@ -1258,6 +1269,17 @@ export const useLocutorMesa = () => {
 		autoTrincaHabilitadoRef.current = Boolean(ativo);
 	}, []);
 
+	const alternarAutoRecados = useCallback((ativo) => {
+		const val = Boolean(ativo);
+		setAutoRecadosHabilitado(val);
+		autoRecadosHabilitadoRef.current = val;
+		if (typeof localStorage !== "undefined") {
+			localStorage.setItem("autoRecadosHabilitado", String(val));
+		}
+		updateMesa({ auto_recados: val }).catch(() => {});
+		alternarAutoRecadosIa(val).catch(() => {});
+	}, []);
+
 	const cancelarIaTrinca = useCallback(async () => {
 		try {
 			await cancelarTrincaIa();
@@ -1611,6 +1633,8 @@ export const useLocutorMesa = () => {
 		blocoTrinca,
 		autoTrincaHabilitado,
 		alternarAutoTrinca,
+		autoRecadosHabilitado,
+		alternarAutoRecados,
 		cancelarIaTrinca,
 	};
 };
