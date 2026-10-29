@@ -875,6 +875,13 @@ export const useLocutorMesa = () => {
 
 	const carregarVinhetaNoCanal = useCallback((vinheta) => {
 		if (!vinheta) return;
+		if (vinhetaTimerIntervalRef.current) {
+			clearInterval(vinhetaTimerIntervalRef.current);
+			vinhetaTimerIntervalRef.current = null;
+		}
+		setVinhetaNoArId(null);
+		setVinhetaNoArNome("");
+		setTempoRestanteVinhetaSeg(0);
 		if (ouvindoVinhetaRef.current) {
 			const audio = vinhetaPreviewAudioRef.current;
 			if (audio) {
@@ -1017,7 +1024,7 @@ export const useLocutorMesa = () => {
 				previewAudio &&
 				previewAudio.src &&
 				urlVinheta &&
-				previewAudio.src.includes(urlVinheta.split("/").pop()) &&
+				decodeURI(previewAudio.src).includes(decodeURI(urlVinheta).split("/").pop()) &&
 				Number.isFinite(previewAudio.duration) &&
 				previewAudio.duration > 0
 			) {
@@ -1144,8 +1151,12 @@ export const useLocutorMesa = () => {
 	const liberarVinhetaNoAr = useCallback(
 		async (vinhetaAlvo = null) => {
 			if (vinhetaNoArId) {
-				await pararVinhetaNoAr(true);
-				return;
+				if (!vinhetaAlvo || vinhetaAlvo.id === vinhetaNoArId || vinhetaAlvo.arquivo === vinhetaNoArId) {
+					await pararVinhetaNoAr(true);
+					return;
+				}
+				// Se for uma vinheta diferente, interrompe a anterior para entrar a nova
+				await pararVinhetaNoAr(false);
 			}
 
 			const alvo = vinhetaAlvo || vinhetaSelecionadaRef.current;
@@ -1187,8 +1198,14 @@ export const useLocutorMesa = () => {
 					previewAudio.src = urlVinheta;
 					aplicarVolumeVinhetaPreview(faderVinhetaRef.current);
 					previewAudio.onended = () => pararVinhetaNoAr(true);
-					previewAudio.onerror = () => pararVinhetaNoAr(true);
-					previewAudio.play().catch(() => {});
+					previewAudio.onerror = (e) => {
+						console.warn("[previewAudio error]", e);
+						// NUNCA cancela a transmissão no ar por falha ou bloqueio local de áudio
+					};
+					previewAudio.play().catch((err) => {
+						console.warn("[previewAudio play rejected]", err);
+						// NUNCA cancela a transmissão no ar por política de autoplay local
+					});
 				} catch {
 					// ignore
 				}

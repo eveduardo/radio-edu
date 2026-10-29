@@ -1170,7 +1170,6 @@ const LocutorPage = () => {
 			<audio
 				ref={vinhetaPreviewAudioRef}
 				preload="auto"
-				crossOrigin="anonymous"
 				onEnded={pararEscutaVinheta}
 				onError={pararEscutaVinheta}
 			/>

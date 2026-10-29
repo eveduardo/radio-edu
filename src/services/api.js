@@ -56,10 +56,10 @@ api.interceptors.response.use(
  */
 export const resolveRadioAssetUrl = (relativePath) => {
 	if (!relativePath) return "";
-	if (/^https?:\/\//i.test(relativePath)) return relativePath;
+	if (/^https?:\/\//i.test(relativePath)) return encodeURI(decodeURI(relativePath));
 
 	const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
 	const cleanPath = relativePath.replace(/^\/+/, "").replace(/^radio\//, "");
 
-	return `${cleanBase}/${cleanPath}`;
+	return encodeURI(decodeURI(`${cleanBase}/${cleanPath}`));
 };
