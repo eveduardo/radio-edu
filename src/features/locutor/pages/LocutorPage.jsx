@@ -478,24 +478,13 @@ const LocutorPage = () => {
 								{Math.min(3, (blocoTrinca?.contagem || 0) + 1)} de 3 tocadas
 							</strong>
 						</span>
-						<label className={styles.labelAutoTrinca}>
+						<label className={styles.labelAutoTrinca} title="Locução automática da IA ao final de cada sequência de 3 músicas">
 							<input
 								type="checkbox"
 								checked={autoTrincaHabilitado}
 								onChange={(e) => alternarAutoTrinca(e.target.checked)}
 							/>
-							<span>Locução IA a cada 3 músicas</span>
-						</label>
-						<label
-							className={styles.labelAutoTrinca}
-							title="Lê automaticamente o recado do ouvinte com voz neural de IA assim que a faixa atual terminar"
-						>
-							<input
-								type="checkbox"
-								checked={autoRecadosHabilitado}
-								onChange={(e) => alternarAutoRecados(e.target.checked)}
-							/>
-							<span>Voz IA nos Recados</span>
+							<span>🤖 Locução IA a cada 3 músicas</span>
 						</label>
 					</div>
 				</div>
@@ -510,7 +499,7 @@ const LocutorPage = () => {
 								<label
 									className={styles.labelAutoTrinca}
 									style={{ margin: 0, padding: "2px 8px", background: "rgba(56, 189, 248, 0.08)", borderRadius: "6px", border: "1px solid rgba(56, 189, 248, 0.2)" }}
-									title="Liga ou desliga a leitura com Voz IA nos recados dos ouvintes"
+									title="Lê automaticamente os recados dos ouvintes com Voz IA antes da música solicitada"
 								>
 									<input
 										type="checkbox"
@@ -518,7 +507,7 @@ const LocutorPage = () => {
 										onChange={(e) => alternarAutoRecados(e.target.checked)}
 									/>
 									<span style={{ fontSize: "11px", fontWeight: "600", color: autoRecadosHabilitado ? "#38bdf8" : "#94a3b8" }}>
-										🤖 Voz IA {autoRecadosHabilitado ? "LIGADA" : "DESLIGADA"}
+										🤖 Voz IA nos Recados ({autoRecadosHabilitado ? "LIGADA" : "DESLIGADA"})
 									</span>
 								</label>
 								<button
