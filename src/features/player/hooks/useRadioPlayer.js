@@ -533,7 +533,14 @@ export const useRadioPlayer = () => {
 					aplicarVolumesMesa();
 
 					const posicionarOffset = () => {
-						if (!forcarProxima && offsetExato > 2 && !novaUrl.includes("temp_trinca") && !novaUrl.includes("hora_certa")) {
+						const eAudioEspecialSemSeek =
+							novaUrl.includes("locucao_") ||
+							novaUrl.includes("temp_trinca") ||
+							novaUrl.includes("temp_recado") ||
+							novaUrl.includes("recadinhosFlash") ||
+							novaUrl.includes("hora_certa") ||
+							novaUrl.includes("vinhetas/");
+						if (!forcarProxima && offsetExato > 2 && !eAudioEspecialSemSeek) {
 							try {
 								deckAtivo.currentTime = offsetExato;
 							} catch {
@@ -894,21 +901,6 @@ export const useRadioPlayer = () => {
 				return;
 			}
 
-			// Locuções e vinhetas da IA (como anúncio de trincas e hora certa) devem falar até a última palavra sem corte de crossfade!
-			const eLocucaoAtual =
-				urlFaixaAtualRef.current &&
-				(urlFaixaAtualRef.current.includes("temp_trinca") ||
-					urlFaixaAtualRef.current.includes("vinhetas/") ||
-					urlFaixaAtualRef.current.includes("hora_certa"));
-			const eLocucaoProxima =
-				proximaUrlRef.current &&
-				(proximaUrlRef.current.includes("temp_trinca") ||
-					proximaUrlRef.current.includes("vinhetas/") ||
-					proximaUrlRef.current.includes("hora_certa"));
-			if (eLocucaoAtual || eLocucaoProxima) {
-				return;
-			}
-
 			const deckAtual =
 				deckAtivoRef.current === "A"
 					? playerRef.current
@@ -922,8 +914,27 @@ export const useRadioPlayer = () => {
 				!deckAtual ||
 				deckAtual.paused ||
 				!Number.isFinite(deckAtual.duration) ||
-				deckAtual.duration < 5
+				deckAtual.duration < 3
 			) {
+				return;
+			}
+
+			// Identifica com precisão cirúrgica se o áudio que está tocando no deck é uma locução da IA ou vinheta
+			const srcAtual = `${deckAtual?.src || ""} ${urlFaixaAtualRef.current || ""} ${tituloMusica || ""}`.toLowerCase();
+			const ehLocucaoAtual =
+				srcAtual.includes("locucao_") ||
+				srcAtual.includes("temp_") ||
+				srcAtual.includes("vinhetas/") ||
+				srcAtual.includes("vinheta") ||
+				srcAtual.includes("hora_certa") ||
+				srcAtual.includes("recadinho") ||
+				srcAtual.includes("recado") ||
+				srcAtual.includes("trinca") ||
+				srcAtual.includes("flash fm -");
+
+			// Locuções e vinhetas (como trinca de sucessos, recados dos ouvintes e hora certa)
+			// NUNCA podem sofrer corte antecipado de 2s! Devem falar até a última sílaba e terminar no evento natural 'ended'.
+			if (ehLocucaoAtual) {
 				return;
 			}
 

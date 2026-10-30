@@ -198,7 +198,7 @@ export const cancelarTrincaIa = async () => {
 	const { data } = await api.get("/radio_sync.php", {
 		params: {
 			cancelar_trinca_ia: 1,
-			limpar_temp_vinheta: "vinhetas/temp_trinca.mp3",
+			limpar_temp_vinheta: "vinhetas/locucao_trinca.mp3",
 			t: Date.now(),
 		},
 	});
