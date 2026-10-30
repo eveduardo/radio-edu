@@ -47,6 +47,22 @@ api.interceptors.response.use(
 	},
 );
 
+export const R2_STORAGE_URL = "https://pub-22e8765882e44af2b9abf39208d2f0bc.r2.dev";
+
+// Pastas de músicas confirmadas no Cloudflare R2
+const R2_MIGRATED_GENRES = [
+	"acustico",
+	"anos_70_80_90_internacional",
+	"bossa_nova",
+	"instrumental",
+	"moda_viola",
+	"mpb",
+	"pop_nacional",
+	"rock_classico",
+	"romanticas",
+	"sertanejo_universitario",
+];
+
 /**
  * Resolve um caminho relativo retornado pelo backend PHP (ex.: `musicas/faixa.mp3`,
  * `hora_certa/19_00.mp3`, `voz_stream/chunk_123.webm`) para a URL completa.
@@ -58,8 +74,17 @@ export const resolveRadioAssetUrl = (relativePath) => {
 	if (!relativePath) return "";
 	if (/^https?:\/\//i.test(relativePath)) return encodeURI(decodeURI(relativePath));
 
-	const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
 	const cleanPath = relativePath.replace(/^\/+/, "").replace(/^radio\//, "");
+	if (cleanPath.startsWith("musicas/")) {
+		const r2Path = cleanPath.replace(/^musicas\//, "");
+		const folder = (r2Path.split("/")[0] || "").toLowerCase();
+		if (R2_MIGRATED_GENRES.includes(folder)) {
+			return encodeURI(decodeURI(`${R2_STORAGE_URL}/${r2Path}`));
+		}
+		const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
+		return encodeURI(decodeURI(`${cleanBase}/${cleanPath}`));
+	}
 
+	const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
 	return encodeURI(decodeURI(`${cleanBase}/${cleanPath}`));
 };

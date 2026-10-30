@@ -83,6 +83,16 @@ const LocutorPage = () => {
 		}),
 	);
 
+	const dataFormatada = useMemo(() => {
+		return new Date()
+			.toLocaleDateString("pt-BR", {
+				weekday: "short",
+				day: "2-digit",
+				month: "2-digit",
+			})
+			.toUpperCase();
+	}, []);
+
 	useEffect(() => {
 		const timer = setInterval(() => {
 			setRelogioAoVivo(
@@ -142,37 +152,75 @@ const LocutorPage = () => {
 		<div className={styles.locutorScreen}>
 			<div className={styles.containerMesa}>
 				<div className={styles.topoMesa}>
-					<h1 className={styles.titulo}>
-						🎙️ MESA MASTER{" "}
-						<span
-							style={{
-								fontSize: "11px",
-								color: "#38bdf8",
-								fontWeight: "normal",
-								marginLeft: "6px",
-							}}
-						>
-							(v2.7)
-						</span>
-					</h1>
-					<div className={styles.relogioMesa}>
-						<span className={styles.relogioPonto}>●</span>
-						<span className={styles.relogioTexto}>{relogioAoVivo}</span>
+					<div className={styles.topoMarca}>
+						<img
+							src="/img/logoFM.jpg"
+							alt="Flash FM"
+							className={styles.logoRadioTopo}
+						/>
+						<div className={styles.topoTextos}>
+							<h1 className={styles.titulo}>
+								🎙️ MESA MASTER <span className={styles.versaoBadge}>v2.7</span>
+							</h1>
+							<span className={styles.subtituloEstudio}>
+								ESTÚDIO PRINCIPAL • EMISSORA AO VIVO
+							</span>
+						</div>
 					</div>
-					<div
-						className={styles.badgeAudiencia}
-						title={`Audiência em tempo real: ${ouvintesConectados} ouvinte(s) conectado(s)${picoHoje > 0 ? ` • Pico hoje: ${picoHoje}` : ""}`}
-					>
-						<span className={styles.badgeAudienciaPonto}>●</span>
-						<span className={styles.badgeAudienciaIcone}>👥</span>
-						<span className={styles.badgeAudienciaQtd}>{ouvintesConectados}</span>
-						<span className={styles.badgeAudienciaRotulo}>
-							{ouvintesConectados === 1 ? "ouvinte" : "ouvintes"}
-						</span>
+
+					<div className={styles.topoAcoes}>
+						<div className={styles.relogioMesa}>
+							<span className={styles.relogioPonto}>●</span>
+							<span className={styles.relogioTexto}>{relogioAoVivo}</span>
+							<span className={styles.relogioData}>{dataFormatada}</span>
+						</div>
+
+						{programaAtual && (
+							<div
+								className={styles.badgeProgramaMesa}
+								title={`${programaAtual.nome || "Programa"} (${programaAtual.horario || ""})`}
+							>
+								<span className={styles.badgeProgramaIcone}>
+									{programaAtual.icone || "📻"}
+								</span>
+								<span className={styles.badgeProgramaNome}>
+									{programaAtual.nome}
+								</span>
+							</div>
+						)}
+
+						<div
+							className={styles.badgeAudiencia}
+							title={`Audiência em tempo real: ${ouvintesConectados} ouvinte(s) conectado(s)${picoHoje > 0 ? ` • Pico hoje: ${picoHoje}` : ""}`}
+						>
+							<span className={styles.badgeAudienciaPonto}>●</span>
+							<span className={styles.badgeAudienciaIcone}>👥</span>
+							<span className={styles.badgeAudienciaQtd}>
+								{ouvintesConectados}
+							</span>
+							<span className={styles.badgeAudienciaRotulo}>
+								{ouvintesConectados === 1 ? "ouvinte" : "ouvintes"}
+							</span>
+						</div>
+
+						<a
+							href="https://datasystem-ce.com.br/radio/"
+							target="_blank"
+							rel="noreferrer"
+							className={styles.btnAbrirPlayer}
+							title="Abrir Player Público dos Ouvintes em nova aba"
+						>
+							<span>📻</span>
+							<span>Player Público</span>
+						</a>
 					</div>
 				</div>
 
-				{/* SEÇÃO DA MESA COM FADERS E VU METERS */}
+				{/* GRID PRINCIPAL EM 3 COLUNAS */}
+				<div className={styles.gridMesaLayout}>
+					{/* COLUNA 1: TRANSMISSÃO (MESA DE CANAIS + NO AR) */}
+					<div className={styles.colunaMesa}>
+						{/* SEÇÃO DA MESA COM FADERS E VU METERS */}
 				<div className={styles.secaoCanais}>
 					{/* CH 1: MICROFONE */}
 					<div className={styles.canalFader}>
@@ -488,11 +536,12 @@ const LocutorPage = () => {
 						</label>
 					</div>
 				</div>
+			</div>
 
-				{/* ÁREA INFERIOR ROLÁVEL (MANTÉM A MESA MASTER ACIMA SEMPRE FIXA) */}
-				<div className={styles.areaPaineisInferiores}>
-					{/* PAINEL DE PEDIDOS DOS OUVINTES */}
-					<div className={styles.painelPedidos}>
+			{/* COLUNA 2: PEDIDOS DOS OUVINTES */}
+			<div className={styles.colunaMesa}>
+				{/* PAINEL DE PEDIDOS DOS OUVINTES */}
+				<div className={styles.painelPedidos}>
 						<div className={styles.painelPedidosHeader}>
 							<span>📩 Pedidos dos Ouvintes ({pedidos.length})</span>
 							<div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -618,7 +667,10 @@ const LocutorPage = () => {
 							)}
 						</div>
 					</div>
+				</div>
 
+				{/* COLUNA 3: DISPAROS (VINHETAS + ACERVO) */}
+				<div className={clsx(styles.colunaMesa, styles.colDisparos)}>
 					{/* PAINEL DE VINHETAS, JINGOS E PREFIXOS POR SUBPASTA */}
 					<div className={styles.painelVinhetas}>
 						<div className={styles.painelHeader}>
@@ -725,6 +777,7 @@ const LocutorPage = () => {
 					</div>
 				</div>
 			</div>
+		</div>
 
 			{/* MODAL DE LEITURA AMPLIADA DO PEDIDO DO OUVINTE */}
 			<Modal
