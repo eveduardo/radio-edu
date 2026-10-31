@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	adicionarFaixaFilaProgramacao,
 	alternarAutoRecadosIa,
+	alternarAutoTrincaIa,
 	cancelarTrincaIa,
 	discardNextTrack,
 	fetchFilaProgramacao,
@@ -186,8 +187,14 @@ export const useLocutorMesa = () => {
 		total: 3,
 		historico: [],
 	});
-	const [autoTrincaHabilitado, setAutoTrincaHabilitado] = useState(true);
-	const autoTrincaHabilitadoRef = useRef(true);
+	const [autoTrincaHabilitado, setAutoTrincaHabilitado] = useState(() => {
+		const salvo =
+			typeof localStorage !== "undefined"
+				? localStorage.getItem("autoTrincaHabilitado")
+				: null;
+		return salvo !== null ? salvo === "true" : false;
+	});
+	const autoTrincaHabilitadoRef = useRef(autoTrincaHabilitado);
 	autoTrincaHabilitadoRef.current = autoTrincaHabilitado;
 
 	const [autoRecadosHabilitado, setAutoRecadosHabilitado] = useState(() => {
@@ -637,6 +644,14 @@ export const useLocutorMesa = () => {
 				}
 
 				if (data.bloco_trinca) {
+					if (
+						typeof localStorage !== "undefined" &&
+						localStorage.getItem("autoTrincaHabilitado") === null &&
+						typeof data.bloco_trinca.auto_trinca !== "undefined"
+					) {
+						setAutoTrincaHabilitado(Boolean(data.bloco_trinca.auto_trinca));
+						autoTrincaHabilitadoRef.current = Boolean(data.bloco_trinca.auto_trinca);
+					}
 					setBlocoTrinca({
 						contagem: data.bloco_trinca.contagem || 0,
 						total: data.bloco_trinca.total || 3,
@@ -808,6 +823,8 @@ export const useLocutorMesa = () => {
 	}, [aplicarDadosSyncNaMesa]);
 
 	useEffect(() => {
+		alternarAutoTrincaIa(autoTrincaHabilitadoRef.current).catch(() => {});
+		alternarAutoRecadosIa(autoRecadosHabilitadoRef.current).catch(() => {});
 		monitorarMusicaNoAr();
 		// Consulta contínua da mesa: a cada 5 segundos
 		const syncInterval = setInterval(monitorarMusicaNoAr, 5000);
@@ -1388,8 +1405,19 @@ export const useLocutorMesa = () => {
 	liberarVinhetaNoArRef.current = liberarVinhetaNoAr;
 
 	const alternarAutoTrinca = useCallback((ativo) => {
-		setAutoTrincaHabilitado(Boolean(ativo));
-		autoTrincaHabilitadoRef.current = Boolean(ativo);
+		const val = Boolean(ativo);
+		setAutoTrincaHabilitado(val);
+		autoTrincaHabilitadoRef.current = val;
+		if (typeof localStorage !== "undefined") {
+			localStorage.setItem("autoTrincaHabilitado", String(val));
+		}
+		updateMesa({ auto_trinca: val }).catch(() => {});
+		alternarAutoTrincaIa(val).catch(() => {});
+		if (!val) {
+			cancelarTrincaIa().catch(() => {});
+			ultimoAnuncioTrincaRef.current = "cancelado_" + Date.now();
+			setBlocoTrinca((prev) => ({ ...prev, anuncio_pendente: null }));
+		}
 	}, []);
 
 	const alternarAutoRecados = useCallback((ativo) => {

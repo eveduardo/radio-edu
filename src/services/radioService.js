@@ -221,6 +221,22 @@ export const alternarAutoRecadosIa = async (ativo) => {
 };
 
 /**
+ * Liga ou desliga a locução automática de IA a cada 3 músicas (Trinca)
+ * (`radio_sync.php?auto_trinca=1|0`).
+ *
+ * @param {boolean} ativo
+ */
+export const alternarAutoTrincaIa = async (ativo) => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: {
+			auto_trinca: ativo ? "1" : "0",
+			t: Date.now(),
+		},
+	});
+	return data;
+};
+
+/**
  * Lista o acervo indexado agrupado por gênero (`radio_sync.php?listar_generos=1`).
  *
  * @returns {Promise<Record<string, Array<{id: string, arquivo: string, nome: string, genero: string, url: string, duracao: number}>>>}
