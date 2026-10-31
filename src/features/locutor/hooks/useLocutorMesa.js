@@ -102,6 +102,7 @@ export const useLocutorMesa = () => {
 	const [ouvintesConectados, setOuvintesConectados] = useState(0);
 	const [picoHoje, setPicoHoje] = useState(0);
 	const [programaAtual, setProgramaAtual] = useState(null);
+	const [proximoPrograma, setProximoPrograma] = useState(null);
 
 	const [pedidos, setPedidos] = useState([]);
 	const [mapaGeneros, setMapaGeneros] = useState({});
@@ -548,6 +549,9 @@ export const useLocutorMesa = () => {
 				}
 				if (data.programa) {
 					setProgramaAtual(data.programa);
+				}
+				if (data.proximo_programa) {
+					setProximoPrograma(data.proximo_programa);
 				}
 
 				if (data.bloco_trinca) {
@@ -1591,6 +1595,7 @@ export const useLocutorMesa = () => {
 		ouvintesConectados,
 		picoHoje,
 		programaAtual,
+		proximoPrograma,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,

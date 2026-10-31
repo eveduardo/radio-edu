@@ -5,6 +5,45 @@ import { VerticalVuMeter } from "../components/VerticalVuMeter";
 import { useLocutorMesa } from "../hooks/useLocutorMesa";
 import styles from "./LocutorPage.module.css";
 
+const PADS_CARTUCHEIRA = [
+	{
+		id: "pad_flash_no_ar",
+		nome: "Flash No Ar",
+		icone: "⚡",
+		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/flash-no-ar-em-qualquer-lugar.mp3",
+	},
+	{
+		id: "pad_voz_seca",
+		nome: "Voz Seca",
+		icone: "🎙️",
+		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/radio-flash-voz-seca-feminina.mp3",
+	},
+	{
+		id: "pad_slogan",
+		nome: "Slogan FM",
+		icone: "🌟",
+		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/slogan-radio-flash-voz-seca-feminina.mp3",
+	},
+	{
+		id: "pad_recadinhos",
+		nome: "Recadinhos",
+		icone: "💌",
+		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/recadinhosFlash.mp3",
+	},
+	{
+		id: "pad_no_ar_fem",
+		nome: "No Ar Fem",
+		icone: "📻",
+		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/flash-no-ar-em-qualquer-lugar-voz-femina.mp3",
+	},
+	{
+		id: "pad_chime",
+		nome: "Sino Estúdio",
+		icone: "🔔",
+		arquivo: null,
+	},
+];
+
 const LocutorPage = () => {
 	const {
 		aoVivo,
@@ -21,6 +60,7 @@ const LocutorPage = () => {
 		ouvintesConectados,
 		picoHoje,
 		programaAtual,
+		proximoPrograma,
 		pedidos,
 		mapaGeneros,
 		mapaVinhetas,
@@ -105,6 +145,137 @@ const LocutorPage = () => {
 		}, 1000);
 		return () => clearInterval(timer);
 	}, []);
+
+	const [padChimeAtivo, setPadChimeAtivo] = useState(false);
+
+	const tocarChimeEstudio = useCallback(() => {
+		setPadChimeAtivo(true);
+		setTimeout(() => setPadChimeAtivo(false), 1800);
+		try {
+			const AudioCtx = window.AudioContext || window.webkitAudioContext;
+			if (!AudioCtx) return;
+			const ctx = new AudioCtx();
+			const vol = typeof faderVinheta === "number" ? faderVinheta : 1.0;
+
+			const osc1 = ctx.createOscillator();
+			const osc2 = ctx.createOscillator();
+			const gain = ctx.createGain();
+
+			osc1.type = "sine";
+			osc1.frequency.setValueAtTime(880, ctx.currentTime);
+			osc1.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.15);
+
+			osc2.type = "triangle";
+			osc2.frequency.setValueAtTime(1320, ctx.currentTime);
+
+			gain.gain.setValueAtTime(0.35 * vol, ctx.currentTime);
+			gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.6);
+
+			osc1.connect(gain);
+			osc2.connect(gain);
+			gain.connect(ctx.destination);
+
+			osc1.start();
+			osc2.start();
+			osc1.stop(ctx.currentTime + 1.6);
+			osc2.stop(ctx.currentTime + 1.6);
+		} catch (e) {
+			console.warn("Erro ao sintetizar chime de estúdio:", e);
+		}
+	}, [faderVinheta]);
+
+	const [gradeCompleta, setGradeCompleta] = useState(null);
+
+	useEffect(() => {
+		let ativo = true;
+		const carregarGrade = async () => {
+			try {
+				const res = await fetch("./grade_programacao.json?t=" + Date.now());
+				if (res.ok) {
+					const data = await res.json();
+					if (ativo && data && Array.isArray(data.programas)) {
+						setGradeCompleta(data.programas);
+					}
+				}
+			} catch (e) {
+				console.warn("Erro ao carregar grade no React:", e);
+			}
+		};
+		carregarGrade();
+		const interval = setInterval(carregarGrade, 60000);
+		return () => {
+			ativo = false;
+			clearInterval(interval);
+		};
+	}, []);
+
+	const proximosProgramas = useMemo(() => {
+		if (!gradeCompleta || gradeCompleta.length === 0) {
+			if (proximoPrograma) {
+				return [
+					{
+						id: proximoPrograma.id || "prox",
+						nome: proximoPrograma.nome || "Próximo Programa",
+						horario: proximoPrograma.horario || "--:--",
+						icone: proximoPrograma.icone || "⏰",
+						rotulo: "A Seguir",
+						tagClass: styles.tagASeguir,
+					},
+				];
+			}
+			return [];
+		}
+
+		const agora = new Date();
+		const diaSemana = agora.getDay();
+		const minAgora = agora.getHours() * 60 + agora.getMinutes();
+
+		const progsHoje = gradeCompleta.filter((p) => {
+			const dias = p.dias_semana || [0, 1, 2, 3, 4, 5, 6];
+			return dias.includes(diaSemana);
+		});
+		const lista = progsHoje.length > 0 ? progsHoje : gradeCompleta;
+
+		const progsComMin = lista.map((p, idx) => {
+			const [hI, mI] = (p.inicio || "00:00").split(":").map(Number);
+			const [hF, mF] = (p.fim || "00:00").split(":").map(Number);
+			let iniMin = hI * 60 + mI;
+			let fimMin = hF * 60 + mF;
+			if (fimMin === 0 && iniMin > 0) fimMin = 1440;
+			return { ...p, iniMin, fimMin, idxOriginal: idx };
+		});
+
+		let idxAtual = progsComMin.findIndex((p) => {
+			if (p.fimMin > p.iniMin) {
+				return minAgora >= p.iniMin && minAgora < p.fimMin;
+			} else {
+				return minAgora >= p.iniMin || minAgora < p.fimMin;
+			}
+		});
+		if (idxAtual === -1) idxAtual = 0;
+
+		const res = [];
+		const total = progsComMin.length;
+		if (total > 1) {
+			const p1 = progsComMin[(idxAtual + 1) % total];
+			res.push({
+				...p1,
+				horario: `${p1.inicio} - ${p1.fim}`,
+				rotulo: "A Seguir",
+				tagClass: styles.tagASeguir,
+			});
+			if (total > 2) {
+				const p2 = progsComMin[(idxAtual + 2) % total];
+				res.push({
+					...p2,
+					horario: `${p2.inicio} - ${p2.fim}`,
+					rotulo: "Depois",
+					tagClass: styles.tagDepois,
+				});
+			}
+		}
+		return res;
+	}, [gradeCompleta, proximoPrograma]);
 
 	const faixasDoGeneroFiltradas = useMemo(() => {
 		if (!generoModalAtivo) return [];
@@ -523,6 +694,103 @@ const LocutorPage = () => {
 							/>
 							<span>🤖 Locução IA a cada 3 músicas</span>
 						</label>
+					</div>
+				</div>
+
+				{/* CARTUCHEIRA RÁPIDA (SOUNDBOARD DE DISPARO INSTANTÂNEO NO CH-3) */}
+				<div className={styles.painelCartucheira}>
+					<div className={styles.headerCartucheira}>
+						<span style={{ color: "#38bdf8" }}>⚡ Cartucheira Rápida (CH-3)</span>
+						{vinhetaNoArId && (
+							<button
+								type="button"
+								className={styles.btnPararCartucho}
+								onClick={() => pararVinhetaNoAr(true)}
+								title="Interromper vinheta que está no ar"
+							>
+								⏹ Parar Vinheta
+							</button>
+						)}
+					</div>
+					<div className={styles.gridCartucheira}>
+						{PADS_CARTUCHEIRA.map((pad) => {
+							const estaTocando =
+								pad.id === "pad_chime"
+									? padChimeAtivo
+									: vinhetaNoArId === pad.arquivo || vinhetaNoArId === pad.id;
+
+							return (
+								<button
+									key={pad.id}
+									type="button"
+									className={clsx(
+										styles.btnPadCartucho,
+										estaTocando && styles.tocando
+									)}
+									onClick={() => {
+										if (pad.id === "pad_chime") {
+											tocarChimeEstudio();
+										} else if (estaTocando) {
+											pararVinhetaNoAr(true);
+										} else {
+											liberarVinhetaNoAr({
+												id: pad.id,
+												nome: pad.nome,
+												arquivo: pad.arquivo,
+												url: pad.arquivo,
+											});
+										}
+									}}
+									title={`Disparar ${pad.nome} no CH-3`}
+								>
+									<span>{pad.icone}</span>
+									<span>{pad.nome}</span>
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				{/* PRÓXIMOS PROGRAMAS DA GRADE */}
+				<div className={styles.painelGradeProximos}>
+					<div className={styles.headerGradeProximos}>
+						<span style={{ color: "#facc15" }}>🗓️ A Seguir na Grade</span>
+						<span style={{ fontSize: "10px", color: "#64748b", fontWeight: 600 }}>
+							HOJE
+						</span>
+					</div>
+					<div className={styles.listaGradeProximos}>
+						{proximosProgramas.length === 0 ? (
+							<div
+								style={{
+									fontSize: "11px",
+									color: "#64748b",
+									textAlign: "center",
+									padding: "6px",
+								}}
+							>
+								Nenhum próximo programa cadastrado.
+							</div>
+						) : (
+							proximosProgramas.map((prog) => (
+								<div key={prog.id} className={styles.itemGradeProximo}>
+									<div className={styles.itemGradeEsquerda}>
+										<span className={styles.badgeHoraProximo}>
+											{prog.horario || `${prog.inicio} - ${prog.fim}`}
+										</span>
+										<span
+											className={styles.nomeGradeProximo}
+											title={`${prog.nome}${prog.slogan ? `: ${prog.slogan}` : ""}`}
+										>
+											{prog.icone || "📻"} {prog.nome}
+										</span>
+									</div>
+									<span className={clsx(styles.tagGradeStatus, prog.tagClass)}>
+										{prog.rotulo}
+									</span>
+								</div>
+							))
+						)}
 					</div>
 				</div>
 			</div>
