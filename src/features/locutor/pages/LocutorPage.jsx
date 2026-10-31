@@ -7,40 +7,40 @@ import styles from "./LocutorPage.module.css";
 
 const PADS_CARTUCHEIRA = [
 	{
-		id: "pad_flash_no_ar",
-		nome: "Flash No Ar",
-		icone: "⚡",
-		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/flash-no-ar-em-qualquer-lugar.mp3",
+		id: "pad_aplausos",
+		nome: "Aplausos",
+		icone: "👏",
+		arquivo: "vinhetas/efeitos/aplausos.wav",
 	},
 	{
-		id: "pad_voz_seca",
-		nome: "Voz Seca",
-		icone: "🎙️",
-		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/radio-flash-voz-seca-feminina.mp3",
+		id: "pad_risada",
+		nome: "Risada",
+		icone: "😂",
+		arquivo: "vinhetas/efeitos/risada.wav",
 	},
 	{
-		id: "pad_slogan",
-		nome: "Slogan FM",
-		icone: "🌟",
-		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/slogan-radio-flash-voz-seca-feminina.mp3",
-	},
-	{
-		id: "pad_recadinhos",
-		nome: "Recadinhos",
-		icone: "💌",
-		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/recadinhosFlash.mp3",
-	},
-	{
-		id: "pad_no_ar_fem",
-		nome: "No Ar Fem",
-		icone: "📻",
-		arquivo: "vinhetas/aarquivos_vinhetas_prefixo/flash-no-ar-em-qualquer-lugar-voz-femina.mp3",
-	},
-	{
-		id: "pad_chime",
-		nome: "Sino Estúdio",
+		id: "pad_gongo",
+		nome: "Gongo/Sino",
 		icone: "🔔",
-		arquivo: null,
+		arquivo: "vinhetas/efeitos/gongo.wav",
+	},
+	{
+		id: "pad_sirene",
+		nome: "Sirene",
+		icone: "🚨",
+		arquivo: "vinhetas/efeitos/sirene.wav",
+	},
+	{
+		id: "pad_impacto",
+		nome: "Impacto",
+		icone: "💥",
+		arquivo: "vinhetas/efeitos/impacto.wav",
+	},
+	{
+		id: "pad_corneta",
+		nome: "Corneta",
+		icone: "🎺",
+		arquivo: "vinhetas/efeitos/corneta.wav",
 	},
 ];
 
@@ -697,27 +697,25 @@ const LocutorPage = () => {
 					</div>
 				</div>
 
-				{/* CARTUCHEIRA RÁPIDA (SOUNDBOARD DE DISPARO INSTANTÂNEO NO CH-3) */}
+				{/* CARTUCHEIRA RÁPIDA DE EFEITOS (SOUNDBOARD DE DISPARO INSTANTÂNEO NO CH-3) */}
 				<div className={styles.painelCartucheira}>
 					<div className={styles.headerCartucheira}>
-						<span style={{ color: "#38bdf8" }}>⚡ Cartucheira Rápida (CH-3)</span>
+						<span style={{ color: "#38bdf8" }}>⚡ Cartucheira de Efeitos (CH-3)</span>
 						{vinhetaNoArId && (
 							<button
 								type="button"
 								className={styles.btnPararCartucho}
 								onClick={() => pararVinhetaNoAr(true)}
-								title="Interromper vinheta que está no ar"
+								title="Interromper efeito que está no ar"
 							>
-								⏹ Parar Vinheta
+								⏹ Parar Efeito
 							</button>
 						)}
 					</div>
 					<div className={styles.gridCartucheira}>
 						{PADS_CARTUCHEIRA.map((pad) => {
 							const estaTocando =
-								pad.id === "pad_chime"
-									? padChimeAtivo
-									: vinhetaNoArId === pad.arquivo || vinhetaNoArId === pad.id;
+								vinhetaNoArId === pad.arquivo || vinhetaNoArId === pad.id;
 
 							return (
 								<button
@@ -728,9 +726,7 @@ const LocutorPage = () => {
 										estaTocando && styles.tocando
 									)}
 									onClick={() => {
-										if (pad.id === "pad_chime") {
-											tocarChimeEstudio();
-										} else if (estaTocando) {
+										if (estaTocando) {
 											pararVinhetaNoAr(true);
 										} else {
 											liberarVinhetaNoAr({
