@@ -35,11 +35,19 @@ const normalizarUrlAudio = (u) => {
 				? window.location.href
 				: "http://localhost",
 		).pathname;
-		return decodeURIComponent(p).toLowerCase().trim();
+		try {
+			return decodeURIComponent(p).toLowerCase().trim();
+		} catch {
+			return p.toLowerCase().trim();
+		}
 	} catch {
-		return decodeURIComponent(String(u).split("?")[0])
-			.toLowerCase()
-			.trim();
+		try {
+			return decodeURIComponent(String(u).split("?")[0])
+				.toLowerCase()
+				.trim();
+		} catch {
+			return String(u).split("?")[0].toLowerCase().trim();
+		}
 	}
 };
 
@@ -668,7 +676,10 @@ export const useRadioPlayer = () => {
 		try {
 			const passos = 7;
 			const tempoPasso = 90;
-			const player = playerRef.current;
+			const player =
+				deckAtivoRef.current === "A"
+					? playerRef.current
+					: playerDeckBRef.current;
 			const ctx = audioCtxRef.current;
 			const gainNodeMusica = gainNodeMusicaRef.current;
 			const volAtual = player?.volume ?? 1;
@@ -1544,8 +1555,14 @@ export const useRadioPlayer = () => {
 		});
 	}, [aplicarVolumesMesa, sincronizarRadio]);
 
-	const handleTrackError = useCallback(() => {
+	const handleTrackError = useCallback((e) => {
 		if (emTransicaoSuaveRef.current) return;
+		console.warn(
+			"[handleTrackError] Falha no deck de áudio:",
+			e?.target?.error?.code,
+			e?.target?.error?.message,
+			e?.target?.src,
+		);
 		setStatusTexto("Reconectando áudio...");
 		// Reconecta o áudio sem forçar pulo prematuro de música
 		setTimeout(() => sincronizarRadio(false, { recarregarAudio: true }), 2500);

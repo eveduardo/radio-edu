@@ -34,11 +34,19 @@ const normalizarUrlAudio = (u) => {
 				? window.location.href
 				: "http://localhost",
 		).pathname;
-		return decodeURIComponent(p).toLowerCase().trim();
+		try {
+			return decodeURIComponent(p).toLowerCase().trim();
+		} catch {
+			return p.toLowerCase().trim();
+		}
 	} catch {
-		return decodeURIComponent(String(u).split("?")[0])
-			.toLowerCase()
-			.trim();
+		try {
+			return decodeURIComponent(String(u).split("?")[0])
+				.toLowerCase()
+				.trim();
+		} catch {
+			return String(u).split("?")[0].toLowerCase().trim();
+		}
 	}
 };
 
@@ -677,7 +685,12 @@ export const useLocutorMesa = () => {
 
 						const eAudioEspecial = ehAudioEspecialIaOuVinheta(novaUrl) || ehAudioEspecialIaOuVinheta(data.faixa_atual.nome);
 
-						if (trocouFaixa || !audio.src) {
+						const precisaCarregarNoAudio =
+							trocouFaixa ||
+							!audio.src ||
+							normalizarUrlAudio(audio.src) !== novaUrlNorm;
+
+						if (precisaCarregarNoAudio) {
 							audio.src = novaUrl;
 							aplicarVolumeMonitor(faderMusicaRef.current);
 							const offset = Math.max(0, data.offset_segundos || 0);

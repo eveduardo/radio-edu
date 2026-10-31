@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flash-fm-pwa-v6';
+const CACHE_NAME = 'flash-fm-pwa-v7';
 const ASSETS = [
   '/',
   '/index.html',
@@ -30,12 +30,24 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Ignora áudio, streaming, backend PHP, Firebase e métodos não-GET
+  // Ignora completamente e deixa o navegador tratar nativamente:
+  // áudio, streaming, range requests, Cloudflare R2, backend PHP, Firebase e métodos não-GET
   if (
     e.request.method !== 'GET' ||
+    e.request.destination === 'audio' ||
+    e.request.destination === 'video' ||
+    e.request.headers.has('range') ||
+    e.request.url.includes('r2.dev') ||
+    e.request.url.includes('.r2.cloudflarestorage.com') ||
     e.request.url.includes('/musicas/') || 
     e.request.url.includes('/voz_stream/') || 
     e.request.url.includes('/vinhetas/') ||
+    e.request.url.includes('/hora_certa/') ||
+    e.request.url.includes('.mp3') ||
+    e.request.url.includes('.m4a') ||
+    e.request.url.includes('.ogg') ||
+    e.request.url.includes('.wav') ||
+    e.request.url.includes('.webm') ||
     e.request.url.includes('.php') || 
     e.request.url.includes('firebaseio.com') ||
     e.request.url.includes('streamlabs.com')

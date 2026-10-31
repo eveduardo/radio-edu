@@ -68,23 +68,47 @@ const R2_MIGRATED_GENRES = [
 ];
 
 /**
- * Codifica uma URL de mídia preservando segurança e integridade:
- * Evita duplas codificações (como %2526 gerado por decodeURI com encodeURI),
- * preserva o caractere '&' em nomes de artistas/faixas e codifica espaços e acentos.
+ * Codifica uma URL de mídia preservando segurança e compatibilidade com Cloudflare R2 / S3:
+ * Garante que caracteres reservados em caminhos de arquivos (como '&' -> %26, espaços -> %20, acentos UTF-8)
+ * sejam codificados corretamente pelo padrão RFC 3986, SEM sofrer dupla codificação (%2526 ou %252C).
  *
  * @param {string} rawUrl
  * @returns {string}
  */
 export const safeEncodeAudioUrl = (rawUrl) => {
 	if (!rawUrl) return "";
-	let clean = String(rawUrl).replace(/%25([0-9a-fA-F]{2})/g, "%$1");
-	clean = clean.replace(/%26/gi, "&");
 	try {
-		clean = decodeURI(clean);
+		const parsed = new URL(rawUrl);
+		const segments = parsed.pathname.split("/").map((seg) => {
+			if (!seg) return "";
+			let decoded = seg;
+			try {
+				decoded = decodeURIComponent(seg);
+			} catch {
+				try {
+					decoded = decodeURI(seg);
+				} catch {
+					decoded = seg.replace(/%20/g, " ").replace(/%26/gi, "&");
+				}
+			}
+			return encodeURIComponent(decoded)
+				.replace(/'/g, "%27")
+				.replace(/\(/g, "%28")
+				.replace(/\)/g, "%29");
+		});
+		parsed.pathname = segments.join("/");
+		return parsed.toString();
 	} catch {
-		// ignore
+		let clean = String(rawUrl).replace(/%25([0-9a-fA-F]{2})/g, "%$1");
+		try {
+			clean = decodeURIComponent(clean);
+		} catch {
+			try {
+				clean = decodeURI(clean);
+			} catch {}
+		}
+		return encodeURI(clean).replace(/&/g, "%26");
 	}
-	return encodeURI(clean);
 };
 
 /**

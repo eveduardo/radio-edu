@@ -1660,8 +1660,10 @@ const LocutorPage = () => {
 			<audio
 				ref={monitorAudioRef}
 				preload="auto"
-				crossOrigin="anonymous"
 				onEnded={monitorarMusicaNoAr}
+				onError={(e) => {
+					console.warn("[monitorAudio] Erro de reprodução:", e?.target?.error);
+				}}
 			/>
 			<audio
 				ref={vinhetaPreviewAudioRef}
