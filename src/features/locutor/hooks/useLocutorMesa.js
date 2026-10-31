@@ -128,6 +128,8 @@ export const useLocutorMesa = () => {
 			modo: "auto_dj",
 		};
 	});
+	const filaProgramaRef = useRef(filaPrograma);
+	filaProgramaRef.current = filaPrograma;
 	const [mapaGeneros, setMapaGeneros] = useState({});
 	const [mapaVinhetas, setMapaVinhetas] = useState({});
 	const [vinhetaSelecionada, setVinhetaSelecionada] = useState(null);
@@ -211,6 +213,9 @@ export const useLocutorMesa = () => {
 	const timestampSyncRef = useRef(Date.now());
 	const viradaConsultadaRef = useRef(false);
 	const acervoMusicasGlobalRef = useRef([]);
+	const ultimaTrocaLocalRef = useRef(0);
+	const faixaLocalNomeRef = useRef("");
+	const executarViradaFilaParaNoArRef = useRef(null);
 
 	const aplicarVolumeMonitor = useCallback((vol) => {
 		const audio = monitorAudioRef.current;
@@ -547,10 +552,21 @@ export const useLocutorMesa = () => {
 	const aplicarDadosSyncNaMesa = useCallback(
 		(data) => {
 			if (data?.faixa_atual) {
+				if (Date.now() - ultimaTrocaLocalRef.current < 4000 && faixaLocalNomeRef.current) {
+					if (data.faixa_atual.nome !== faixaLocalNomeRef.current) {
+						return;
+					}
+				}
 				setMusicaAtual(data.faixa_atual.nome || "Sem título");
-				const nomeProx = data.proxima_faixa?.nome || "";
-				proximaNomeServidorRef.current = nomeProx;
-				setProximaAtual(`A seguir: ${nomeProx || "--"}`);
+				if (filaProgramaRef.current?.faixas?.length > 0) {
+					const proxFila = filaProgramaRef.current.faixas[0];
+					setProximaAtual(`A seguir (Roteiro): ${proxFila.nome}`);
+					proximaNomeServidorRef.current = proxFila.nome;
+				} else {
+					const nomeProx = data.proxima_faixa?.nome || "";
+					proximaNomeServidorRef.current = nomeProx;
+					setProximaAtual(`A seguir: ${nomeProx || "--"}`);
+				}
 				duracaoAtualRef.current = data.faixa_atual.duracao || 180;
 				baseOffsetRef.current = data.offset_segundos || 0;
 				timestampSyncRef.current = Date.now();
@@ -613,6 +629,13 @@ export const useLocutorMesa = () => {
 					}
 
 					if (ouvindoProgramacaoRef.current && audio) {
+						audio.onended = () => {
+							if (filaProgramaRef.current?.faixas?.length > 0) {
+								executarViradaFilaParaNoArRef.current?.();
+							} else {
+								monitorarMusicaNoAr();
+							}
+						};
 						if (trocouFaixa || !audio.src || audio.paused) {
 							audio.src = novaUrl;
 							aplicarVolumeMonitor(faderMusicaRef.current);
@@ -759,10 +782,14 @@ export const useLocutorMesa = () => {
 			);
 			setTempoRestanteSeg(restante);
 
-			// Quando faltar <= 1s, consulta uma única vez o servidor para virar a faixa sem spam
+			// Quando faltar <= 1s, vira automaticamente para a fila do programa ou consulta o servidor sem spam
 			if (restante <= 1 && !viradaConsultadaRef.current && !musicaPausadaRef.current) {
 				viradaConsultadaRef.current = true;
-				monitorarMusicaNoAr();
+				if (filaProgramaRef.current?.faixas?.length > 0) {
+					executarViradaFilaParaNoArRef.current?.();
+				} else {
+					monitorarMusicaNoAr();
+				}
 			}
 		}, 1000);
 
@@ -793,27 +820,31 @@ export const useLocutorMesa = () => {
 		faderMusicaAnteriorRef.current = null;
 
 		try {
-			// Se não houve agendamento manual nem pedido pendente, fixa a faixa exibida em "A seguir"
-			// antes de virar a faixa para que o servidor não faça um sorteio aleatório diferente do visor
-			const haPedidoPendente = pedidosRef.current.some((p) => !p.tocado);
-			const nomeProximaVisor = proximaNomeServidorRef.current
-				.replace(/\s*\([^)]+\)\s*$/, "")
-				.trim();
+			if (filaProgramaRef.current?.faixas?.length > 0) {
+				await executarViradaFilaParaNoArRef.current?.();
+			} else {
+				// Se não houve agendamento manual nem pedido pendente, fixa a faixa exibida em "A seguir"
+				// antes de virar a faixa para que o servidor não faça um sorteio aleatório diferente do visor
+				const haPedidoPendente = pedidosRef.current.some((p) => !p.tocado);
+				const nomeProximaVisor = proximaNomeServidorRef.current
+					.replace(/\s*\([^)]+\)\s*$/, "")
+					.trim();
 
-			if (
-				!temAgendamentoExplicitoRef.current &&
-				!haPedidoPendente &&
-				nomeProximaVisor
-			) {
-				await scheduleNextTrack(nomeProximaVisor, {
-					ignorarPedido: true,
-				}).catch(() => {});
+				if (
+					!temAgendamentoExplicitoRef.current &&
+					!haPedidoPendente &&
+					nomeProximaVisor
+				) {
+					await scheduleNextTrack(nomeProximaVisor, {
+						ignorarPedido: true,
+					}).catch(() => {});
+				}
+
+				// 1. Vira a faixa no servidor e atualiza o visor da mesa
+				const novoEstado = await fetchRadioSync({ forcarProxima: true });
+				temAgendamentoExplicitoRef.current = false;
+				aplicarDadosSyncNaMesa(novoEstado);
 			}
-
-			// 1. Vira a faixa no servidor e atualiza o visor da mesa
-			const novoEstado = await fetchRadioSync({ forcarProxima: true });
-			temAgendamentoExplicitoRef.current = false;
-			aplicarDadosSyncNaMesa(novoEstado);
 		} catch {
 			// ignore
 		}
@@ -1530,9 +1561,65 @@ export const useLocutorMesa = () => {
 	}, [monitorarMusicaNoAr]);
 
 	const agendarFaixaAcervo = useCallback(
-		async (faixa, tocarAgora = false) => {
+		async (faixa, tocarAgora = false, automatico = false) => {
 			const idParaEnviar = faixa.id || faixa.arquivo || faixa.url || "";
 			const nomeFaixa = faixa.nome || "Música";
+
+			// Atualização local imediata na mesa se for tocar agora
+			if (tocarAgora) {
+				ultimaTrocaLocalRef.current = Date.now();
+				faixaLocalNomeRef.current = nomeFaixa;
+				setMusicaAtual(nomeFaixa);
+				const dur = Number(faixa.duracao) || 180;
+				duracaoAtualRef.current = dur;
+				baseOffsetRef.current = 0;
+				timestampSyncRef.current = Date.now();
+				offsetAtualRef.current = 0;
+				setTempoRestanteSeg(dur);
+				viradaConsultadaRef.current = false;
+
+				// Se ainda tem faixa seguinte na fila do programa, já antecipa no visor
+				const proximaNaFila = filaProgramaRef.current?.faixas?.[0];
+				if (proximaNaFila) {
+					setProximaAtual(`A seguir (Roteiro): ${proximaNaFila.nome}`);
+					proximaNomeServidorRef.current = proximaNaFila.nome;
+				}
+
+				// Atualiza áudio do monitor da mesa se estiver ouvindo programação
+				const audio = monitorAudioRef.current;
+				const novaUrl = resolveRadioAssetUrl(faixa.url || faixa.arquivo || "");
+				if (novaUrl) {
+					urlFaixaNoArRef.current = novaUrl;
+					if (audio) {
+						audio.onended = () => {
+							if (filaProgramaRef.current?.faixas?.length > 0) {
+								executarViradaFilaParaNoArRef.current?.();
+							} else {
+								monitorarMusicaNoAr();
+							}
+						};
+						if (ouvindoProgramacaoRef.current && audio) {
+							audio.src = novaUrl;
+							audio.currentTime = 0;
+							aplicarVolumeMonitor(faderMusicaRef.current);
+							if (!musicaPausadaRef.current) {
+								audio.play().catch(() => {});
+							}
+						}
+					}
+				}
+
+				// Notifica ouvintes imediatamente via Firebase
+				updateMesa({
+					musica_tocando: true,
+					forcar_troca: Date.now(),
+					faixa_atual: {
+						nome: nomeFaixa,
+						duracao: dur,
+						url: faixa.url || "",
+					},
+				}).catch(() => {});
+			}
 
 			try {
 				const data = await scheduleNextTrack(idParaEnviar, {
@@ -1547,24 +1634,25 @@ export const useLocutorMesa = () => {
 						if (data?.faixa_atual) {
 							aplicarDadosSyncNaMesa(data);
 						}
-						await updateMesa({ musica_tocando: true, forcar_troca: Date.now() }).catch(() => {});
-						setAvisoModal({
-							icone: "✅",
-							titulo: "Música no Ar",
-							mensagem: `Música colocada no ar com sucesso:\n"${nomeFaixa}"`,
-						});
+						if (!automatico) {
+							setAvisoModal({
+								icone: "✅",
+								titulo: "Música no Ar",
+								mensagem: `Música colocada no ar com sucesso:\n"${nomeFaixa}"`,
+							});
+						}
 						setTimeout(monitorarMusicaNoAr, 600);
 					} else {
-						setProximaAtual(`A seguir (Agendada): ${nomeFaixa}`);
-						updateMesa({ atualizacao_programacao: Date.now() }).catch(() => {});
-						setAvisoModal({
-							icone: "✅",
-							titulo: "Faixa Agendada",
-							mensagem: `Próxima música agendada com sucesso:\n"${nomeFaixa}"`,
-						});
+						if (!automatico) {
+							setAvisoModal({
+								icone: "✅",
+								titulo: "Faixa Agendada",
+								mensagem: `Próxima música agendada com sucesso:\n"${nomeFaixa}"`,
+							});
+						}
 						setTimeout(monitorarMusicaNoAr, 500);
 					}
-				} else {
+				} else if (!automatico) {
 					setAvisoModal({
 						icone: "⚠️",
 						titulo: "Atenção",
@@ -1572,19 +1660,25 @@ export const useLocutorMesa = () => {
 					});
 				}
 			} catch (err) {
-				const msgErro =
-					err?.response?.data?.erro ||
-					err?.response?.data?.error ||
-					err?.message ||
-					"Erro de conexão ao agendar a música.";
-				setAvisoModal({
-					icone: "⚠️",
-					titulo: "Erro de Conexão",
-					mensagem: `Não foi possível agendar a música:\n${msgErro}`,
-				});
+				console.warn(
+					"[agendarFaixaAcervo] Sincronização de agendamento:",
+					err?.message,
+				);
+				if (!automatico) {
+					const msgErro =
+						err?.response?.data?.erro ||
+						err?.response?.data?.error ||
+						err?.message ||
+						"Erro de conexão ao agendar a música.";
+					setAvisoModal({
+						icone: "⚠️",
+						titulo: "Erro de Conexão",
+						mensagem: `Não foi possível agendar a música:\n${msgErro}`,
+					});
+				}
 			}
 		},
-		[monitorarMusicaNoAr, transicaoSuaveProxima, aplicarDadosSyncNaMesa],
+		[aplicarDadosSyncNaMesa, monitorarMusicaNoAr, aplicarVolumeMonitor],
 	);
 
 	const carregarFila = useCallback(async () => {
@@ -1635,6 +1729,7 @@ export const useLocutorMesa = () => {
 				duracao_formatada: `~${Math.round(totalSeg / 60)} min`,
 				modo: "roteiro",
 			};
+			filaProgramaRef.current = novaFila;
 			try {
 				localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
 			} catch {}
@@ -1650,6 +1745,7 @@ export const useLocutorMesa = () => {
 		try {
 			const res = await adicionarFaixaFilaProgramacao(payload);
 			if (res && res.sucesso && Array.isArray(res.faixas)) {
+				filaProgramaRef.current = res;
 				setFilaPrograma(res);
 				try {
 					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
@@ -1689,6 +1785,7 @@ export const useLocutorMesa = () => {
 				duracao_formatada: `~${Math.round(totalSeg / 60)} min`,
 				modo: faixasAtuais.length > 0 ? "roteiro" : "auto_dj",
 			};
+			filaProgramaRef.current = novaFila;
 			try {
 				localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
 			} catch {}
@@ -1700,6 +1797,7 @@ export const useLocutorMesa = () => {
 		try {
 			const res = await removerFaixaFilaProgramacao(indice, id);
 			if (res && res.sucesso && Array.isArray(res.faixas)) {
+				filaProgramaRef.current = res;
 				setFilaPrograma(res);
 				try {
 					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
@@ -1731,6 +1829,7 @@ export const useLocutorMesa = () => {
 				duracao_formatada: `~${Math.round(totalSeg / 60)} min`,
 				modo: faixasAtuais.length > 0 ? "roteiro" : "auto_dj",
 			};
+			filaProgramaRef.current = novaFila;
 			try {
 				localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
 			} catch {}
@@ -1742,6 +1841,7 @@ export const useLocutorMesa = () => {
 		try {
 			const res = await moverFaixaFilaProgramacao(de, para);
 			if (res && res.sucesso && Array.isArray(res.faixas)) {
+				filaProgramaRef.current = res;
 				setFilaPrograma(res);
 				try {
 					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
@@ -1758,6 +1858,7 @@ export const useLocutorMesa = () => {
 			duracao_formatada: "~0 min",
 			modo: "auto_dj",
 		};
+		filaProgramaRef.current = novaFila;
 		setFilaPrograma(novaFila);
 		try {
 			localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
@@ -1768,6 +1869,7 @@ export const useLocutorMesa = () => {
 		try {
 			const res = await limparFilaProgramacao();
 			if (res && res.sucesso && Array.isArray(res.faixas)) {
+				filaProgramaRef.current = res;
 				setFilaPrograma(res);
 			}
 		} catch {}
@@ -1775,13 +1877,51 @@ export const useLocutorMesa = () => {
 
 	const tocarFaixaFilaAgora = useCallback(
 		async (indice) => {
-			const faixa = filaPrograma?.faixas?.[indice];
+			const faixas = filaProgramaRef.current?.faixas || [];
+			const faixa = faixas[indice];
 			if (!faixa) return;
 			await removerFaixaFila(indice, faixa.id);
-			await agendarFaixaAcervo(faixa, true);
+			await agendarFaixaAcervo(faixa, true, false);
 		},
-		[filaPrograma, removerFaixaFila, agendarFaixaAcervo],
+		[removerFaixaFila, agendarFaixaAcervo],
 	);
+
+	const executarViradaFilaParaNoAr = useCallback(async () => {
+		if (transicaoEmAndamentoRef.current) return false;
+		const faixas = filaProgramaRef.current?.faixas || [];
+		if (faixas.length === 0) {
+			monitorarMusicaNoAr();
+			return false;
+		}
+
+		transicaoEmAndamentoRef.current = true;
+		try {
+			const faixaParaTocar = faixas[0];
+			await removerFaixaFila(0, faixaParaTocar.id);
+			await agendarFaixaAcervo(faixaParaTocar, true, true);
+			return true;
+		} finally {
+			setTimeout(() => {
+				transicaoEmAndamentoRef.current = false;
+			}, 2000);
+		}
+	}, [removerFaixaFila, agendarFaixaAcervo, monitorarMusicaNoAr]);
+	executarViradaFilaParaNoArRef.current = executarViradaFilaParaNoAr;
+
+	useEffect(() => {
+		if (filaPrograma?.faixas?.length > 0) {
+			const prox = filaPrograma.faixas[0];
+			setProximaAtual(`A seguir (Roteiro): ${prox.nome}`);
+			proximaNomeServidorRef.current = prox.nome;
+			const idParaEnviar = prox.id || prox.arquivo || prox.url || prox.nome;
+			if (idParaEnviar) {
+				scheduleNextTrack(idParaEnviar, { ignorarPedido: true }).catch(() => {});
+			}
+		} else {
+			// Se a fila esvaziou, volta ao sorteio automático da grade (Auto-DJ)
+			monitorarMusicaNoAr();
+		}
+	}, [filaPrograma, monitorarMusicaNoAr]);
 
 	const minutosRestantes = String(Math.floor(tempoRestanteSeg / 60)).padStart(
 		2,
