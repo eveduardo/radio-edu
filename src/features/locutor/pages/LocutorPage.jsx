@@ -160,7 +160,7 @@ const LocutorPage = () => {
 						/>
 						<div className={styles.topoTextos}>
 							<h1 className={styles.titulo}>
-								🎙️ MESA MASTER <span className={styles.versaoBadge}>v2.7</span>
+								🎙️ MESA MASTER <span className={styles.versaoBadge}>v2.8</span>
 							</h1>
 							<span className={styles.subtituloEstudio}>
 								ESTÚDIO PRINCIPAL • EMISSORA AO VIVO

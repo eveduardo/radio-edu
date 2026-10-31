@@ -108,8 +108,8 @@
 
 .gridMesaLayout {
 	display: grid;
-	grid-template-columns: 310px 1fr 1.3fr;
-	gap: 12px;
+	grid-template-columns: 460px 1fr 310px;
+	gap: 14px;
 	align-items: stretch;
 	width: 100%;
 }
@@ -444,7 +444,6 @@
 .botoesCanalVinheta {
 	margin-top: 5px;
 	width: 100%;
-	max-width: 118px;
 	display: flex;
 	gap: 4px;
 }
@@ -993,16 +992,16 @@
 	flex: 1;
 	overflow-y: auto;
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-	grid-auto-rows: 40px;
+	grid-template-columns: repeat(2, 1fr);
+	grid-auto-rows: 38px;
 	align-content: start;
 	gap: 6px;
 	padding-right: 2px;
 }
 
 .gridAcervoGeneros {
-	grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)) !important;
-	grid-auto-rows: 40px !important;
+	grid-template-columns: repeat(2, 1fr) !important;
+	grid-auto-rows: 38px !important;
 }
 
 .cardGeneroBtn {
