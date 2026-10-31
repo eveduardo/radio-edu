@@ -561,3 +561,67 @@ export const fetchListenerAudience = async () => {
 	return data;
 };
 
+/**
+ * Obtém os dados da Fila do Programa (Playlist do Locutor) (`radio_sync.php?obter_fila=1`).
+ *
+ * @returns {Promise<{sucesso: boolean, faixas: Array, total: number, duracao_total: number, duracao_formatada: string, modo: string}>}
+ */
+export const fetchFilaProgramacao = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { obter_fila: "1", t: Date.now() },
+	});
+	return data;
+};
+
+/**
+ * Adiciona uma faixa à Fila do Programa (`radio_sync.php?acao_fila=adicionar`).
+ *
+ * @param {Object} item
+ * @returns {Promise<{sucesso: boolean, faixas: Array, total: number, duracao_formatada: string, modo: string}>}
+ */
+export const adicionarFaixaFilaProgramacao = async (item) => {
+	const { data } = await api.post("/radio_sync.php?acao_fila=adicionar", item);
+	return data;
+};
+
+/**
+ * Remove uma faixa da Fila do Programa por índice ou id (`radio_sync.php?acao_fila=remover`).
+ *
+ * @param {number} [indice]
+ * @param {string} [id]
+ * @returns {Promise<{sucesso: boolean, faixas: Array, total: number, duracao_formatada: string, modo: string}>}
+ */
+export const removerFaixaFilaProgramacao = async (indice, id) => {
+	const params = { acao_fila: "remover", t: Date.now() };
+	if (typeof indice === "number") params.indice = indice;
+	if (id) params.id = id;
+	const { data } = await api.get("/radio_sync.php", { params });
+	return data;
+};
+
+/**
+ * Reordena uma faixa na Fila do Programa (`radio_sync.php?acao_fila=mover`).
+ *
+ * @param {number} de
+ * @param {number} para
+ * @returns {Promise<{sucesso: boolean, faixas: Array, total: number, duracao_formatada: string, modo: string}>}
+ */
+export const moverFaixaFilaProgramacao = async (de, para) => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { acao_fila: "mover", de, para, t: Date.now() },
+	});
+	return data;
+};
+
+/**
+ * Limpa todas as faixas da Fila do Programa (`radio_sync.php?acao_fila=limpar`).
+ *
+ * @returns {Promise<{sucesso: boolean, faixas: Array, total: number, duracao_formatada: string, modo: string}>}
+ */
+export const limparFilaProgramacao = async () => {
+	const { data } = await api.get("/radio_sync.php", {
+		params: { acao_fila: "limpar", t: Date.now() },
+	});
+	return data;
+};
+

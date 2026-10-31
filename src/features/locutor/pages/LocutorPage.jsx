@@ -107,7 +107,16 @@ const LocutorPage = () => {
 		autoRecadosHabilitado,
 		alternarAutoRecados,
 		cancelarIaTrinca,
+		filaPrograma,
+		carregarFila,
+		adicionarFaixaFila,
+		removerFaixaFila,
+		moverFaixaFila,
+		limparFila,
+		tocarFaixaFilaAgora,
 	} = useLocutorMesa();
+
+	const [adicionandoFilaId, setAdicionandoFilaId] = useState(null);
 
 	const [modalTrincaAberto, setModalTrincaAberto] = useState(false);
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
@@ -372,6 +381,150 @@ const LocutorPage = () => {
 							<span className={styles.badgeAudienciaRotulo}>
 								{ouvintesConectados === 1 ? "ouvinte" : "ouvintes"}
 							</span>
+						</div>
+					</div>
+
+					{/* NOVO CARD: FILA DO PROGRAMA (PLAYLIST DO LOCUTOR) */}
+					<div className={styles.painelFilaPrograma}>
+						<div className={styles.painelFilaHeader}>
+							<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+								<span>📋 Fila do Programa</span>
+								<span
+									className={styles.badgePedidosCount}
+									style={{
+										color: "#38bdf8",
+										background: "rgba(56, 189, 248, 0.15)",
+										borderColor: "rgba(56, 189, 248, 0.35)",
+									}}
+								>
+									{filaPrograma?.faixas?.length || 0}{" "}
+									{(filaPrograma?.faixas?.length || 0) === 1 ? "faixa" : "faixas"}
+									{filaPrograma?.duracao_formatada ? ` • ${filaPrograma.duracao_formatada}` : ""}
+								</span>
+							</div>
+							<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+								<span
+									className={clsx(
+										styles.badgeFilaStatus,
+										(filaPrograma?.faixas?.length || 0) > 0
+											? styles.badgeStatusRoteiro
+											: styles.badgeStatusAutoDj,
+									)}
+									title={
+										(filaPrograma?.faixas?.length || 0) > 0
+											? "O sistema tocará estas faixas em ordem"
+											: "Fila vazia: o sistema toca pelo sorteio automático da pasta do programa"
+									}
+								>
+									{(filaPrograma?.faixas?.length || 0) > 0 ? "Roteiro Ativo" : "Auto-DJ"}
+								</span>
+								{(filaPrograma?.faixas?.length || 0) > 0 && (
+									<button
+										type="button"
+										className={styles.btnLimparFila}
+										onClick={() => {
+											if (
+												window.confirm(
+													"Deseja realmente limpar toda a fila do programa? O sistema voltará ao sorteio automático da grade.",
+												)
+											) {
+												limparFila();
+											}
+										}}
+										title="Limpar todas as faixas do roteiro"
+									>
+										🗑️ Limpar
+									</button>
+								)}
+							</div>
+						</div>
+						<div className={styles.areaScrollFila}>
+							{(filaPrograma?.faixas?.length || 0) === 0 ? (
+								<div
+									style={{
+										fontSize: "11px",
+										color: "#64748b",
+										textAlign: "center",
+										padding: "25px 10px",
+										lineHeight: 1.5,
+									}}
+								>
+									Fila vazia.
+									<br />
+									O sistema está tocando pelo <b>sorteio automático</b> da grade.
+									<br />
+									<span style={{ fontSize: "10px", color: "#38bdf8", opacity: 0.85 }}>
+										Abra o Acervo e clique em <b>➕ Fila</b> para montar seu roteiro.
+									</span>
+								</div>
+							) : (
+								filaPrograma.faixas.map((f, idx) => {
+									const durTxt =
+										f.duracao_formatada ||
+										(f.duracao
+											? `${Math.floor(f.duracao / 60)}:${String(f.duracao % 60).padStart(2, "0")}`
+											: "");
+									return (
+										<div key={f.id || `fila_${idx}`} className={styles.itemFilaLinha}>
+											<div className={styles.itemFilaEsquerda}>
+												<span className={styles.itemFilaOrdem}>{idx + 1}</span>
+												<div className={styles.itemFilaTitulo} title={f.nome || ""}>
+													{f.nome || "Música"}{" "}
+													<span
+														style={{
+															fontSize: "9.5px",
+															color: "#94a3b8",
+															fontWeight: "normal",
+															marginLeft: "4px",
+														}}
+													>
+														({f.genero || "Acervo"}
+														{durTxt ? ` • ${durTxt}` : ""})
+													</span>
+												</div>
+											</div>
+											<div className={styles.itemFilaAcoes}>
+												{idx > 0 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para cima"
+														onClick={() => moverFaixaFila(idx, idx - 1)}
+													>
+														▲
+													</button>
+												)}
+												{idx < filaPrograma.faixas.length - 1 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para baixo"
+														onClick={() => moverFaixaFila(idx, idx + 1)}
+													>
+														▼
+													</button>
+												)}
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaPlay)}
+													title="Tocar agora (cortar para esta faixa)"
+													onClick={() => tocarFaixaFilaAgora(idx)}
+												>
+													▶
+												</button>
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaDel)}
+													title="Remover da fila"
+													onClick={() => removerFaixaFila(idx, f.id)}
+												>
+													✕
+												</button>
+											</div>
+										</div>
+									);
+								})
+							)}
 						</div>
 					</div>
 				</div>
@@ -920,6 +1073,150 @@ const LocutorPage = () => {
 							)}
 						</div>
 					</div>
+
+					{/* NOVO CARD: FILA DO PROGRAMA (PLAYLIST DO LOCUTOR) */}
+					<div className={styles.painelFilaPrograma}>
+						<div className={styles.painelFilaHeader}>
+							<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+								<span>📋 Fila do Programa</span>
+								<span
+									className={styles.badgePedidosCount}
+									style={{
+										color: "#38bdf8",
+										background: "rgba(56, 189, 248, 0.15)",
+										borderColor: "rgba(56, 189, 248, 0.35)",
+									}}
+								>
+									{filaPrograma?.faixas?.length || 0}{" "}
+									{(filaPrograma?.faixas?.length || 0) === 1 ? "faixa" : "faixas"}
+									{filaPrograma?.duracao_formatada ? ` • ${filaPrograma.duracao_formatada}` : ""}
+								</span>
+							</div>
+							<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+								<span
+									className={clsx(
+										styles.badgeFilaStatus,
+										(filaPrograma?.faixas?.length || 0) > 0
+											? styles.badgeStatusRoteiro
+											: styles.badgeStatusAutoDj,
+									)}
+									title={
+										(filaPrograma?.faixas?.length || 0) > 0
+											? "O sistema tocará estas faixas em ordem"
+											: "Fila vazia: o sistema toca pelo sorteio automático da pasta do programa"
+									}
+								>
+									{(filaPrograma?.faixas?.length || 0) > 0 ? "Roteiro Ativo" : "Auto-DJ"}
+								</span>
+								{(filaPrograma?.faixas?.length || 0) > 0 && (
+									<button
+										type="button"
+										className={styles.btnLimparFila}
+										onClick={() => {
+											if (
+												window.confirm(
+													"Deseja realmente limpar toda a fila do programa? O sistema voltará ao sorteio automático da grade.",
+												)
+											) {
+												limparFila();
+											}
+										}}
+										title="Limpar todas as faixas do roteiro"
+									>
+										🗑️ Limpar
+									</button>
+								)}
+							</div>
+						</div>
+						<div className={styles.areaScrollFila}>
+							{(filaPrograma?.faixas?.length || 0) === 0 ? (
+								<div
+									style={{
+										fontSize: "11px",
+										color: "#64748b",
+										textAlign: "center",
+										padding: "25px 10px",
+										lineHeight: 1.5,
+									}}
+								>
+									Fila vazia.
+									<br />
+									O sistema está tocando pelo <b>sorteio automático</b> da grade.
+									<br />
+									<span style={{ fontSize: "10px", color: "#38bdf8", opacity: 0.85 }}>
+										Abra o Acervo e clique em <b>➕ Fila</b> para montar seu roteiro.
+									</span>
+								</div>
+							) : (
+								filaPrograma.faixas.map((f, idx) => {
+									const durTxt =
+										f.duracao_formatada ||
+										(f.duracao
+											? `${Math.floor(f.duracao / 60)}:${String(f.duracao % 60).padStart(2, "0")}`
+											: "");
+									return (
+										<div key={f.id || `fila_${idx}`} className={styles.itemFilaLinha}>
+											<div className={styles.itemFilaEsquerda}>
+												<span className={styles.itemFilaOrdem}>{idx + 1}</span>
+												<div className={styles.itemFilaTitulo} title={f.nome || ""}>
+													{f.nome || "Música"}{" "}
+													<span
+														style={{
+															fontSize: "9.5px",
+															color: "#94a3b8",
+															fontWeight: "normal",
+															marginLeft: "4px",
+														}}
+													>
+														({f.genero || "Acervo"}
+														{durTxt ? ` • ${durTxt}` : ""})
+													</span>
+												</div>
+											</div>
+											<div className={styles.itemFilaAcoes}>
+												{idx > 0 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para cima"
+														onClick={() => moverFaixaFila(idx, idx - 1)}
+													>
+														▲
+													</button>
+												)}
+												{idx < filaPrograma.faixas.length - 1 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para baixo"
+														onClick={() => moverFaixaFila(idx, idx + 1)}
+													>
+														▼
+													</button>
+												)}
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaPlay)}
+													title="Tocar agora (cortar para esta faixa)"
+													onClick={() => tocarFaixaFilaAgora(idx)}
+												>
+													▶
+												</button>
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaDel)}
+													title="Remover da fila"
+													onClick={() => removerFaixaFila(idx, f.id)}
+												>
+													✕
+												</button>
+											</div>
+										</div>
+									);
+								})
+							)}
+						</div>
+					</div>
 				</div>
 
 				{/* COLUNA 3: DISPAROS (VINHETAS + ACERVO) */}
@@ -1023,6 +1320,150 @@ const LocutorPage = () => {
 												{faixas.length}
 											</span>
 										</button>
+									);
+								})
+							)}
+						</div>
+					</div>
+
+					{/* NOVO CARD: FILA DO PROGRAMA (PLAYLIST DO LOCUTOR) */}
+					<div className={styles.painelFilaPrograma}>
+						<div className={styles.painelFilaHeader}>
+							<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+								<span>📋 Fila do Programa</span>
+								<span
+									className={styles.badgePedidosCount}
+									style={{
+										color: "#38bdf8",
+										background: "rgba(56, 189, 248, 0.15)",
+										borderColor: "rgba(56, 189, 248, 0.35)",
+									}}
+								>
+									{filaPrograma?.faixas?.length || 0}{" "}
+									{(filaPrograma?.faixas?.length || 0) === 1 ? "faixa" : "faixas"}
+									{filaPrograma?.duracao_formatada ? ` • ${filaPrograma.duracao_formatada}` : ""}
+								</span>
+							</div>
+							<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+								<span
+									className={clsx(
+										styles.badgeFilaStatus,
+										(filaPrograma?.faixas?.length || 0) > 0
+											? styles.badgeStatusRoteiro
+											: styles.badgeStatusAutoDj,
+									)}
+									title={
+										(filaPrograma?.faixas?.length || 0) > 0
+											? "O sistema tocará estas faixas em ordem"
+											: "Fila vazia: o sistema toca pelo sorteio automático da pasta do programa"
+									}
+								>
+									{(filaPrograma?.faixas?.length || 0) > 0 ? "Roteiro Ativo" : "Auto-DJ"}
+								</span>
+								{(filaPrograma?.faixas?.length || 0) > 0 && (
+									<button
+										type="button"
+										className={styles.btnLimparFila}
+										onClick={() => {
+											if (
+												window.confirm(
+													"Deseja realmente limpar toda a fila do programa? O sistema voltará ao sorteio automático da grade.",
+												)
+											) {
+												limparFila();
+											}
+										}}
+										title="Limpar todas as faixas do roteiro"
+									>
+										🗑️ Limpar
+									</button>
+								)}
+							</div>
+						</div>
+						<div className={styles.areaScrollFila}>
+							{(filaPrograma?.faixas?.length || 0) === 0 ? (
+								<div
+									style={{
+										fontSize: "11px",
+										color: "#64748b",
+										textAlign: "center",
+										padding: "25px 10px",
+										lineHeight: 1.5,
+									}}
+								>
+									Fila vazia.
+									<br />
+									O sistema está tocando pelo <b>sorteio automático</b> da grade.
+									<br />
+									<span style={{ fontSize: "10px", color: "#38bdf8", opacity: 0.85 }}>
+										Abra o Acervo e clique em <b>➕ Fila</b> para montar seu roteiro.
+									</span>
+								</div>
+							) : (
+								filaPrograma.faixas.map((f, idx) => {
+									const durTxt =
+										f.duracao_formatada ||
+										(f.duracao
+											? `${Math.floor(f.duracao / 60)}:${String(f.duracao % 60).padStart(2, "0")}`
+											: "");
+									return (
+										<div key={f.id || `fila_${idx}`} className={styles.itemFilaLinha}>
+											<div className={styles.itemFilaEsquerda}>
+												<span className={styles.itemFilaOrdem}>{idx + 1}</span>
+												<div className={styles.itemFilaTitulo} title={f.nome || ""}>
+													{f.nome || "Música"}{" "}
+													<span
+														style={{
+															fontSize: "9.5px",
+															color: "#94a3b8",
+															fontWeight: "normal",
+															marginLeft: "4px",
+														}}
+													>
+														({f.genero || "Acervo"}
+														{durTxt ? ` • ${durTxt}` : ""})
+													</span>
+												</div>
+											</div>
+											<div className={styles.itemFilaAcoes}>
+												{idx > 0 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para cima"
+														onClick={() => moverFaixaFila(idx, idx - 1)}
+													>
+														▲
+													</button>
+												)}
+												{idx < filaPrograma.faixas.length - 1 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para baixo"
+														onClick={() => moverFaixaFila(idx, idx + 1)}
+													>
+														▼
+													</button>
+												)}
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaPlay)}
+													title="Tocar agora (cortar para esta faixa)"
+													onClick={() => tocarFaixaFilaAgora(idx)}
+												>
+													▶
+												</button>
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaDel)}
+													title="Remover da fila"
+													onClick={() => removerFaixaFila(idx, f.id)}
+												>
+													✕
+												</button>
+											</div>
+										</div>
 									);
 								})
 							)}
@@ -1283,6 +1724,150 @@ const LocutorPage = () => {
 							})()}
 						</div>
 					</div>
+
+					{/* NOVO CARD: FILA DO PROGRAMA (PLAYLIST DO LOCUTOR) */}
+					<div className={styles.painelFilaPrograma}>
+						<div className={styles.painelFilaHeader}>
+							<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+								<span>📋 Fila do Programa</span>
+								<span
+									className={styles.badgePedidosCount}
+									style={{
+										color: "#38bdf8",
+										background: "rgba(56, 189, 248, 0.15)",
+										borderColor: "rgba(56, 189, 248, 0.35)",
+									}}
+								>
+									{filaPrograma?.faixas?.length || 0}{" "}
+									{(filaPrograma?.faixas?.length || 0) === 1 ? "faixa" : "faixas"}
+									{filaPrograma?.duracao_formatada ? ` • ${filaPrograma.duracao_formatada}` : ""}
+								</span>
+							</div>
+							<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+								<span
+									className={clsx(
+										styles.badgeFilaStatus,
+										(filaPrograma?.faixas?.length || 0) > 0
+											? styles.badgeStatusRoteiro
+											: styles.badgeStatusAutoDj,
+									)}
+									title={
+										(filaPrograma?.faixas?.length || 0) > 0
+											? "O sistema tocará estas faixas em ordem"
+											: "Fila vazia: o sistema toca pelo sorteio automático da pasta do programa"
+									}
+								>
+									{(filaPrograma?.faixas?.length || 0) > 0 ? "Roteiro Ativo" : "Auto-DJ"}
+								</span>
+								{(filaPrograma?.faixas?.length || 0) > 0 && (
+									<button
+										type="button"
+										className={styles.btnLimparFila}
+										onClick={() => {
+											if (
+												window.confirm(
+													"Deseja realmente limpar toda a fila do programa? O sistema voltará ao sorteio automático da grade.",
+												)
+											) {
+												limparFila();
+											}
+										}}
+										title="Limpar todas as faixas do roteiro"
+									>
+										🗑️ Limpar
+									</button>
+								)}
+							</div>
+						</div>
+						<div className={styles.areaScrollFila}>
+							{(filaPrograma?.faixas?.length || 0) === 0 ? (
+								<div
+									style={{
+										fontSize: "11px",
+										color: "#64748b",
+										textAlign: "center",
+										padding: "25px 10px",
+										lineHeight: 1.5,
+									}}
+								>
+									Fila vazia.
+									<br />
+									O sistema está tocando pelo <b>sorteio automático</b> da grade.
+									<br />
+									<span style={{ fontSize: "10px", color: "#38bdf8", opacity: 0.85 }}>
+										Abra o Acervo e clique em <b>➕ Fila</b> para montar seu roteiro.
+									</span>
+								</div>
+							) : (
+								filaPrograma.faixas.map((f, idx) => {
+									const durTxt =
+										f.duracao_formatada ||
+										(f.duracao
+											? `${Math.floor(f.duracao / 60)}:${String(f.duracao % 60).padStart(2, "0")}`
+											: "");
+									return (
+										<div key={f.id || `fila_${idx}`} className={styles.itemFilaLinha}>
+											<div className={styles.itemFilaEsquerda}>
+												<span className={styles.itemFilaOrdem}>{idx + 1}</span>
+												<div className={styles.itemFilaTitulo} title={f.nome || ""}>
+													{f.nome || "Música"}{" "}
+													<span
+														style={{
+															fontSize: "9.5px",
+															color: "#94a3b8",
+															fontWeight: "normal",
+															marginLeft: "4px",
+														}}
+													>
+														({f.genero || "Acervo"}
+														{durTxt ? ` • ${durTxt}` : ""})
+													</span>
+												</div>
+											</div>
+											<div className={styles.itemFilaAcoes}>
+												{idx > 0 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para cima"
+														onClick={() => moverFaixaFila(idx, idx - 1)}
+													>
+														▲
+													</button>
+												)}
+												{idx < filaPrograma.faixas.length - 1 && (
+													<button
+														type="button"
+														className={styles.btnAcaoFila}
+														title="Mover para baixo"
+														onClick={() => moverFaixaFila(idx, idx + 1)}
+													>
+														▼
+													</button>
+												)}
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaPlay)}
+													title="Tocar agora (cortar para esta faixa)"
+													onClick={() => tocarFaixaFilaAgora(idx)}
+												>
+													▶
+												</button>
+												<button
+													type="button"
+													className={clsx(styles.btnAcaoFila, styles.btnAcaoFilaDel)}
+													title="Remover da fila"
+													onClick={() => removerFaixaFila(idx, f.id)}
+												>
+													✕
+												</button>
+											</div>
+										</div>
+									);
+								})
+							)}
+						</div>
+					</div>
 				</div>
 			</Modal>
 
@@ -1401,6 +1986,24 @@ const LocutorPage = () => {
 										🎵 {faixa.nome}
 									</span>
 									<div className={styles.botoesAcaoPedido}>
+										<button
+											type="button"
+											className={styles.btnAcervoFila}
+											title="Adicionar à Fila do Programa (Playlist do Locutor)"
+											onClick={async () => {
+												const idFaixa = faixa.id || faixa.arquivo || faixa.nome;
+												setAdicionandoFilaId(idFaixa);
+												await adicionarFaixaFila({
+													...faixa,
+													genero: generoModalAtivo || faixa.genero || "Acervo",
+												});
+												setTimeout(() => setAdicionandoFilaId(null), 1200);
+											}}
+										>
+											{adicionandoFilaId === (faixa.id || faixa.arquivo || faixa.nome)
+												? "✓ Na fila"
+												: "➕ Fila"}
+										</button>
 										<button
 											type="button"
 											className={styles.btnAcervoAgendar}

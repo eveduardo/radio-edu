@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+	adicionarFaixaFilaProgramacao,
 	alternarAutoRecadosIa,
 	cancelarTrincaIa,
 	discardNextTrack,
+	fetchFilaProgramacao,
 	fetchGenresCatalog,
 	fetchListenerAudience,
 	fetchListenerRequests,
 	fetchRadioSync,
 	fetchVinhetasCatalog,
 	gerarVozRecadoIA,
+	limparFilaProgramacao,
 	markRequestAsPlayed,
+	moverFaixaFilaProgramacao,
 	rebuildRadioCache,
+	removerFaixaFilaProgramacao,
 	removeListenerRequest,
 	resolveRadioAssetUrl,
 	scheduleNextTrack,
@@ -105,6 +110,12 @@ export const useLocutorMesa = () => {
 	const [proximoPrograma, setProximoPrograma] = useState(null);
 
 	const [pedidos, setPedidos] = useState([]);
+	const [filaPrograma, setFilaPrograma] = useState({
+		faixas: [],
+		total: 0,
+		duracao_formatada: "0 min",
+		modo: "auto_dj",
+	});
 	const [mapaGeneros, setMapaGeneros] = useState({});
 	const [mapaVinhetas, setMapaVinhetas] = useState({});
 	const [vinhetaSelecionada, setVinhetaSelecionada] = useState(null);
@@ -573,6 +584,10 @@ export const useLocutorMesa = () => {
 					) {
 						ultimoAnuncioTrincaRef.current = data.bloco_trinca.anuncio_pendente;
 					}
+				}
+
+				if (data.fila_programacao) {
+					setFilaPrograma(data.fila_programacao);
 				}
 
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual.url || "");
@@ -1557,7 +1572,83 @@ export const useLocutorMesa = () => {
 				});
 			}
 		},
-		[monitorarMusicaNoAr, transicaoSuaveProxima],
+		[monitorarMusicaNoAr, transicaoSuaveProxima, aplicarDadosSyncNaMesa],
+	);
+
+	const carregarFila = useCallback(async () => {
+		try {
+			const res = await fetchFilaProgramacao();
+			if (res && res.sucesso) {
+				setFilaPrograma(res);
+			}
+		} catch {
+			// ignore
+		}
+	}, []);
+
+	const adicionarFaixaFila = useCallback(async (faixa) => {
+		if (!faixa) return false;
+		try {
+			const payload = {
+				id: faixa.id || faixa.arquivo || faixa.url || `fx_${Date.now()}`,
+				nome: faixa.nome || "Música",
+				duracao: faixa.duracao || 180,
+				genero: faixa.genero || "Acervo",
+				arquivo: faixa.arquivo || "",
+				url: faixa.url || "",
+			};
+			const res = await adicionarFaixaFilaProgramacao(payload);
+			if (res && res.sucesso) {
+				setFilaPrograma(res);
+				return true;
+			}
+		} catch (err) {
+			console.error("Erro ao adicionar faixa na fila:", err);
+		}
+		return false;
+	}, []);
+
+	const removerFaixaFila = useCallback(async (indice, id) => {
+		try {
+			const res = await removerFaixaFilaProgramacao(indice, id);
+			if (res && res.sucesso) {
+				setFilaPrograma(res);
+			}
+		} catch (err) {
+			console.error("Erro ao remover faixa da fila:", err);
+		}
+	}, []);
+
+	const moverFaixaFila = useCallback(async (de, para) => {
+		try {
+			const res = await moverFaixaFilaProgramacao(de, para);
+			if (res && res.sucesso) {
+				setFilaPrograma(res);
+			}
+		} catch (err) {
+			console.error("Erro ao mover faixa na fila:", err);
+		}
+	}, []);
+
+	const limparFila = useCallback(async () => {
+		try {
+			const res = await limparFilaProgramacao();
+			if (res && res.sucesso) {
+				setFilaPrograma(res);
+			}
+		} catch (err) {
+			console.error("Erro ao limpar fila:", err);
+		}
+	}, []);
+
+	const tocarFaixaFilaAgora = useCallback(
+		async (indice) => {
+			const faixa = filaPrograma?.faixas?.[indice];
+			if (!faixa) return;
+			await removerFaixaFila(indice, faixa.id);
+			await agendarFaixaAcervo(faixa, true);
+		},
+		[filaPrograma, removerFaixaFila, agendarFaixaAcervo],
 	);
 
 	const minutosRestantes = String(Math.floor(tempoRestanteSeg / 60)).padStart(
@@ -1641,5 +1732,12 @@ export const useLocutorMesa = () => {
 		autoRecadosHabilitado,
 		alternarAutoRecados,
 		cancelarIaTrinca,
+		filaPrograma,
+		carregarFila,
+		adicionarFaixaFila,
+		removerFaixaFila,
+		moverFaixaFila,
+		limparFila,
+		tocarFaixaFilaAgora,
 	};
 };
