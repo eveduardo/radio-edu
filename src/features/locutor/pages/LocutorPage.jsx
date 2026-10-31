@@ -202,17 +202,6 @@ const LocutorPage = () => {
 								{ouvintesConectados === 1 ? "ouvinte" : "ouvintes"}
 							</span>
 						</div>
-
-						<a
-							href="https://datasystem-ce.com.br/radio/"
-							target="_blank"
-							rel="noreferrer"
-							className={styles.btnAbrirPlayer}
-							title="Abrir Player Público dos Ouvintes em nova aba"
-						>
-							<span>📻</span>
-							<span>Player Público</span>
-						</a>
 					</div>
 				</div>
 
@@ -556,7 +545,7 @@ const LocutorPage = () => {
 										onChange={(e) => alternarAutoRecados(e.target.checked)}
 									/>
 									<span style={{ fontSize: "11px", fontWeight: "600", color: autoRecadosHabilitado ? "#38bdf8" : "#94a3b8" }}>
-										🤖 Voz IA nos Recados ({autoRecadosHabilitado ? "LIGADA" : "DESLIGADA"})
+										🤖 Ativa Voz IA
 									</span>
 								</label>
 								<button
