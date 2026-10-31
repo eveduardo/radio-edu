@@ -572,7 +572,7 @@ export const useRadioPlayer = () => {
 						const eAudioEspecialSemSeek =
 							ehAudioEspecialIaOuVinheta(novaUrl) ||
 							ehAudioEspecialIaOuVinheta(data.faixa_atual?.nome);
-						if (!forcarProxima && offsetExato > 2 && !eAudioEspecialSemSeek) {
+						if (!forcarProxima && offsetExato > 4 && !eAudioEspecialSemSeek) {
 							try {
 								deckAtivo.currentTime = offsetExato;
 							} catch {
@@ -643,9 +643,10 @@ export const useRadioPlayer = () => {
 					deckAtivo &&
 					estaTocandoRef.current &&
 					!deckAtivo.paused &&
-					deckAtivo.readyState >= 2 &&
+					deckAtivo.readyState >= 3 &&
 					!ehAudioEspecialIaOuVinheta(novaUrl) &&
-					Math.abs(deckAtivo.currentTime - offsetExato) > 25
+					deckAtivo.currentTime > 5 &&
+					Math.abs(deckAtivo.currentTime - offsetExato) > 30
 				) {
 					try {
 						deckAtivo.currentTime = offsetExato;

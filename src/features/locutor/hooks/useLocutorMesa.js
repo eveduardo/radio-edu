@@ -266,6 +266,9 @@ export const useLocutorMesa = () => {
 	const ultimaTrocaLocalRef = useRef(0);
 	const faixaLocalNomeRef = useRef("");
 	const executarViradaFilaParaNoArRef = useRef(null);
+	const filaTinhaItensRef = useRef(false);
+	const ultimoAgendadoFilaRef = useRef(null);
+	const loadedMetadataControllerRef = useRef(null);
 
 	const aplicarVolumeMonitor = useCallback((vol) => {
 		const audio = monitorAudioRef.current;
@@ -673,7 +676,18 @@ export const useLocutorMesa = () => {
 				}
 
 				if (data.fila_programacao) {
-					setFilaPrograma(data.fila_programacao);
+					setFilaPrograma((prev) => {
+						const prevFaixas = prev?.faixas || [];
+						const nextFaixas = data.fila_programacao?.faixas || [];
+						if (
+							prevFaixas.length === nextFaixas.length &&
+							JSON.stringify(prevFaixas.map((f) => f.id || f.url || f.nome)) ===
+								JSON.stringify(nextFaixas.map((f) => f.id || f.url || f.nome))
+						) {
+							return prev;
+						}
+						return data.fila_programacao;
+					});
 				}
 
 				const novaUrl = resolveRadioAssetUrl(data.faixa_atual.url || "");
@@ -698,7 +712,9 @@ export const useLocutorMesa = () => {
 							}
 						};
 
-						const eAudioEspecial = ehAudioEspecialIaOuVinheta(novaUrl) || ehAudioEspecialIaOuVinheta(data.faixa_atual.nome);
+						const eAudioEspecial =
+							ehAudioEspecialIaOuVinheta(novaUrl) ||
+							ehAudioEspecialIaOuVinheta(data.faixa_atual.nome);
 
 						const precisaCarregarNoAudio =
 							trocouFaixa ||
@@ -706,11 +722,21 @@ export const useLocutorMesa = () => {
 							normalizarUrlAudio(audio.src) !== novaUrlNorm;
 
 						if (precisaCarregarNoAudio) {
+							// Cancela qualquer evento de loadedmetadata pendente da faixa anterior
+							if (loadedMetadataControllerRef.current) {
+								loadedMetadataControllerRef.current.abort();
+							}
+							const abortCtrl = new AbortController();
+							loadedMetadataControllerRef.current = abortCtrl;
+
 							audio.src = novaUrl;
 							aplicarVolumeMonitor(faderMusicaRef.current);
 							const offset = Math.max(0, data.offset_segundos || 0);
+
+							// Nunca dá seek em áudios especiais (IA/vinheta) e nunca interrompe
+							// os primeiros segundos de uma música nova (offset <= 4s)
 							const posicionar = () => {
-								if (offset > 2 && !eAudioEspecial) {
+								if (offset > 4 && !eAudioEspecial) {
 									try {
 										audio.currentTime = offset;
 									} catch {
@@ -718,13 +744,18 @@ export const useLocutorMesa = () => {
 									}
 								}
 							};
-							if (audio.readyState >= 1) {
-								posicionar();
-							} else {
-								audio.addEventListener("loadedmetadata", posicionar, {
-									once: true,
-								});
+
+							if (offset > 4 && !eAudioEspecial) {
+								if (audio.readyState >= 1) {
+									posicionar();
+								} else {
+									audio.addEventListener("loadedmetadata", posicionar, {
+										signal: abortCtrl.signal,
+										once: true,
+									});
+								}
 							}
+
 							if (!musicaPausadaRef.current) {
 								audio.play().catch(() => {});
 							} else {
@@ -734,14 +765,15 @@ export const useLocutorMesa = () => {
 							if (!audio.paused) {
 								audio.pause();
 							}
-						} else if (audio.paused) {
-							// Se é a mesma faixa e apenas estava pausado, NÃO reseta audio.src! Apenas despausa
+						} else if (audio.paused && audio.readyState >= 2) {
+							// Se é a mesma faixa e apenas estava pausado (com buffer carregado), despausa
 							aplicarVolumeMonitor(faderMusicaRef.current);
 							audio.play().catch(() => {});
 						} else if (
-							audio.readyState >= 2 &&
+							audio.readyState >= 3 &&
 							!eAudioEspecial &&
-							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 25
+							audio.currentTime > 5 &&
+							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 30
 						) {
 							try {
 								audio.currentTime = Math.max(0, data.offset_segundos || 0);
@@ -860,13 +892,25 @@ export const useLocutorMesa = () => {
 			);
 			setTempoRestanteSeg(restante);
 
-			// Quando faltar <= 1s, vira automaticamente para a fila do programa ou consulta o servidor sem spam
+			// Quando faltar <= 1s, se o áudio NÃO estiver tocando no monitor com tempo sobrando,
+			// aciona a virada ou consulta de sincronização sem spam
 			if (restante <= 1 && !viradaConsultadaRef.current && !musicaPausadaRef.current) {
-				viradaConsultadaRef.current = true;
-				if (filaProgramaRef.current?.faixas?.length > 0) {
-					executarViradaFilaParaNoArRef.current?.();
-				} else {
-					monitorarMusicaNoAr();
+				const audio = monitorAudioRef.current;
+				const audioAindaTocando =
+					ouvindoProgramacaoRef.current &&
+					audio &&
+					!audio.paused &&
+					Number.isFinite(audio.duration) &&
+					audio.duration - audio.currentTime > 1.5;
+
+				// Se o áudio físico ainda está reproduzindo no monitor, deixa o audio.onended virar com precisão natural!
+				if (!audioAindaTocando) {
+					viradaConsultadaRef.current = true;
+					if (filaProgramaRef.current?.faixas?.length > 0) {
+						executarViradaFilaParaNoArRef.current?.();
+					} else {
+						monitorarMusicaNoAr();
+					}
 				}
 			}
 		}, 1000);
@@ -1999,15 +2043,19 @@ export const useLocutorMesa = () => {
 
 	useEffect(() => {
 		if (filaPrograma?.faixas?.length > 0) {
+			filaTinhaItensRef.current = true;
 			const prox = filaPrograma.faixas[0];
 			setProximaAtual(`A seguir (Roteiro): ${prox.nome}`);
 			proximaNomeServidorRef.current = prox.nome;
 			const idParaEnviar = prox.id || prox.arquivo || prox.url || prox.nome;
-			if (idParaEnviar) {
+			if (idParaEnviar && ultimoAgendadoFilaRef.current !== idParaEnviar) {
+				ultimoAgendadoFilaRef.current = idParaEnviar;
 				scheduleNextTrack(idParaEnviar, { ignorarPedido: true }).catch(() => {});
 			}
-		} else {
-			// Se a fila esvaziou, volta ao sorteio automático da grade (Auto-DJ)
+		} else if (filaTinhaItensRef.current) {
+			// A fila TINHA faixas e acabou de esvaziar -> volta ao sorteio automático (Auto-DJ)
+			filaTinhaItensRef.current = false;
+			ultimoAgendadoFilaRef.current = null;
 			monitorarMusicaNoAr();
 		}
 	}, [filaPrograma, monitorarMusicaNoAr]);

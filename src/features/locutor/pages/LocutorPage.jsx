@@ -1660,7 +1660,6 @@ const LocutorPage = () => {
 			<audio
 				ref={monitorAudioRef}
 				preload="auto"
-				onEnded={monitorarMusicaNoAr}
 				onError={(e) => {
 					console.warn("[monitorAudio] Erro de reprodução:", e?.target?.error);
 				}}
