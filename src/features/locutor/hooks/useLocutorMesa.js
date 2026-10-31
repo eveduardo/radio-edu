@@ -110,11 +110,23 @@ export const useLocutorMesa = () => {
 	const [proximoPrograma, setProximoPrograma] = useState(null);
 
 	const [pedidos, setPedidos] = useState([]);
-	const [filaPrograma, setFilaPrograma] = useState({
-		faixas: [],
-		total: 0,
-		duracao_formatada: "0 min",
-		modo: "auto_dj",
+	const [filaPrograma, setFilaPrograma] = useState(() => {
+		try {
+			const salvo =
+				typeof localStorage !== "undefined"
+					? localStorage.getItem("radio_fila_programa")
+					: null;
+			if (salvo) {
+				const parsed = JSON.parse(salvo);
+				if (parsed && Array.isArray(parsed.faixas)) return parsed;
+			}
+		} catch {}
+		return {
+			faixas: [],
+			total: 0,
+			duracao_formatada: "~0 min",
+			modo: "auto_dj",
+		};
 	});
 	const [mapaGeneros, setMapaGeneros] = useState({});
 	const [mapaVinhetas, setMapaVinhetas] = useState({});
@@ -1578,8 +1590,11 @@ export const useLocutorMesa = () => {
 	const carregarFila = useCallback(async () => {
 		try {
 			const res = await fetchFilaProgramacao();
-			if (res && res.sucesso) {
+			if (res && res.sucesso && Array.isArray(res.faixas)) {
 				setFilaPrograma(res);
+				try {
+					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
+				} catch {}
 			}
 		} catch {
 			// ignore
@@ -1588,57 +1603,174 @@ export const useLocutorMesa = () => {
 
 	const adicionarFaixaFila = useCallback(async (faixa) => {
 		if (!faixa) return false;
-		try {
-			const payload = {
-				id: faixa.id || faixa.arquivo || faixa.url || `fx_${Date.now()}`,
-				nome: faixa.nome || "Música",
-				duracao: faixa.duracao || 180,
-				genero: faixa.genero || "Acervo",
-				arquivo: faixa.arquivo || "",
-				url: faixa.url || "",
+		const duracaoNum = Number(faixa.duracao) || 180;
+		const min = Math.floor(duracaoNum / 60);
+		const seg = String(duracaoNum % 60).padStart(2, "0");
+		const payload = {
+			id: faixa.id || faixa.arquivo || faixa.url || `fx_${Date.now()}`,
+			nome: faixa.nome || "Música",
+			duracao: duracaoNum,
+			duracao_formatada: `${min}:${seg}`,
+			genero: faixa.genero || "Acervo",
+			arquivo: faixa.arquivo || "",
+			url: faixa.url || "",
+			adicionado_em: new Date().toLocaleTimeString("pt-BR", {
+				hour: "2-digit",
+				minute: "2-digit",
+			}),
+		};
+
+		// 1. Atualização OTIMISTA imediata no estado local e localStorage
+		setFilaPrograma((prev) => {
+			const faixasAtuais = Array.isArray(prev?.faixas) ? prev.faixas : [];
+			const novasFaixas = [...faixasAtuais, payload];
+			const totalSeg = novasFaixas.reduce(
+				(acc, f) => acc + (Number(f.duracao) || 180),
+				0,
+			);
+			const novaFila = {
+				faixas: novasFaixas,
+				total: novasFaixas.length,
+				duracao_total: totalSeg,
+				duracao_formatada: `~${Math.round(totalSeg / 60)} min`,
+				modo: "roteiro",
 			};
+			try {
+				localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
+			} catch {}
+			return novaFila;
+		});
+
+		// 2. Notifica Firebase em tempo real
+		updateMesa({
+			atualizacao_fila: Date.now(),
+		}).catch(() => {});
+
+		// 3. Persiste no backend PHP (se disponível)
+		try {
 			const res = await adicionarFaixaFilaProgramacao(payload);
-			if (res && res.sucesso) {
+			if (res && res.sucesso && Array.isArray(res.faixas)) {
 				setFilaPrograma(res);
-				return true;
+				try {
+					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
+				} catch {}
 			}
 		} catch (err) {
-			console.error("Erro ao adicionar faixa na fila:", err);
+			console.warn(
+				"[adicionarFaixaFila] Backend PHP indisponível, mantendo fila local:",
+				err?.message,
+			);
 		}
-		return false;
+
+		return true;
 	}, []);
 
 	const removerFaixaFila = useCallback(async (indice, id) => {
+		setFilaPrograma((prev) => {
+			const faixasAtuais = Array.isArray(prev?.faixas) ? [...prev.faixas] : [];
+			if (
+				typeof indice === "number" &&
+				indice >= 0 &&
+				indice < faixasAtuais.length
+			) {
+				faixasAtuais.splice(indice, 1);
+			} else if (id) {
+				const idx = faixasAtuais.findIndex((f) => f.id === id);
+				if (idx >= 0) faixasAtuais.splice(idx, 1);
+			}
+			const totalSeg = faixasAtuais.reduce(
+				(acc, f) => acc + (Number(f.duracao) || 180),
+				0,
+			);
+			const novaFila = {
+				faixas: faixasAtuais,
+				total: faixasAtuais.length,
+				duracao_total: totalSeg,
+				duracao_formatada: `~${Math.round(totalSeg / 60)} min`,
+				modo: faixasAtuais.length > 0 ? "roteiro" : "auto_dj",
+			};
+			try {
+				localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
+			} catch {}
+			return novaFila;
+		});
+
+		updateMesa({ atualizacao_fila: Date.now() }).catch(() => {});
+
 		try {
 			const res = await removerFaixaFilaProgramacao(indice, id);
-			if (res && res.sucesso) {
+			if (res && res.sucesso && Array.isArray(res.faixas)) {
 				setFilaPrograma(res);
+				try {
+					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
+				} catch {}
 			}
-		} catch (err) {
-			console.error("Erro ao remover faixa da fila:", err);
-		}
+		} catch {}
 	}, []);
 
 	const moverFaixaFila = useCallback(async (de, para) => {
+		setFilaPrograma((prev) => {
+			const faixasAtuais = Array.isArray(prev?.faixas) ? [...prev.faixas] : [];
+			if (
+				de >= 0 &&
+				para >= 0 &&
+				de < faixasAtuais.length &&
+				para < faixasAtuais.length
+			) {
+				const item = faixasAtuais.splice(de, 1)[0];
+				faixasAtuais.splice(para, 0, item);
+			}
+			const totalSeg = faixasAtuais.reduce(
+				(acc, f) => acc + (Number(f.duracao) || 180),
+				0,
+			);
+			const novaFila = {
+				faixas: faixasAtuais,
+				total: faixasAtuais.length,
+				duracao_total: totalSeg,
+				duracao_formatada: `~${Math.round(totalSeg / 60)} min`,
+				modo: faixasAtuais.length > 0 ? "roteiro" : "auto_dj",
+			};
+			try {
+				localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
+			} catch {}
+			return novaFila;
+		});
+
+		updateMesa({ atualizacao_fila: Date.now() }).catch(() => {});
+
 		try {
 			const res = await moverFaixaFilaProgramacao(de, para);
-			if (res && res.sucesso) {
+			if (res && res.sucesso && Array.isArray(res.faixas)) {
 				setFilaPrograma(res);
+				try {
+					localStorage.setItem("radio_fila_programa", JSON.stringify(res));
+				} catch {}
 			}
-		} catch (err) {
-			console.error("Erro ao mover faixa na fila:", err);
-		}
+		} catch {}
 	}, []);
 
 	const limparFila = useCallback(async () => {
+		const novaFila = {
+			faixas: [],
+			total: 0,
+			duracao_total: 0,
+			duracao_formatada: "~0 min",
+			modo: "auto_dj",
+		};
+		setFilaPrograma(novaFila);
+		try {
+			localStorage.setItem("radio_fila_programa", JSON.stringify(novaFila));
+		} catch {}
+
+		updateMesa({ atualizacao_fila: Date.now() }).catch(() => {});
+
 		try {
 			const res = await limparFilaProgramacao();
-			if (res && res.sucesso) {
+			if (res && res.sucesso && Array.isArray(res.faixas)) {
 				setFilaPrograma(res);
 			}
-		} catch (err) {
-			console.error("Erro ao limpar fila:", err);
-		}
+		} catch {}
 	}, []);
 
 	const tocarFaixaFilaAgora = useCallback(

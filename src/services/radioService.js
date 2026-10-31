@@ -580,6 +580,22 @@ export const fetchFilaProgramacao = async () => {
  * @returns {Promise<{sucesso: boolean, faixas: Array, total: number, duracao_formatada: string, modo: string}>}
  */
 export const adicionarFaixaFilaProgramacao = async (item) => {
+	const params = {
+		acao_fila: "adicionar",
+		id: item.id || "",
+		nome: item.nome || "",
+		duracao: item.duracao || 180,
+		genero: item.genero || "Acervo",
+		arquivo: item.arquivo || "",
+		url: item.url || "",
+		t: Date.now(),
+	};
+	try {
+		const { data } = await api.get("/radio_sync.php", { params });
+		if (data && data.sucesso) return data;
+	} catch {
+		// tenta fallback via POST
+	}
 	const { data } = await api.post("/radio_sync.php?acao_fila=adicionar", item);
 	return data;
 };
