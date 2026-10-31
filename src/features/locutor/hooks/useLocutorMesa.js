@@ -24,6 +24,41 @@ import {
 	uploadVoiceChunk,
 } from "@/services";
 
+const normalizarUrlAudio = (u) => {
+	if (!u) return "";
+	try {
+		const semQuery = String(u).split("?")[0].split("#")[0];
+		const p = new URL(
+			semQuery,
+			typeof window !== "undefined"
+				? window.location.href
+				: "http://localhost",
+		).pathname;
+		return decodeURIComponent(p).toLowerCase().trim();
+	} catch {
+		return decodeURIComponent(String(u).split("?")[0])
+			.toLowerCase()
+			.trim();
+	}
+};
+
+const ehAudioEspecialIaOuVinheta = (urlOuTitulo) => {
+	if (!urlOuTitulo) return false;
+	const s = String(urlOuTitulo).toLowerCase();
+	return (
+		s.includes("hora_certa") ||
+		s.includes("polly_") ||
+		s.includes("locucao_") ||
+		s.includes("trinca") ||
+		s.includes("recado") ||
+		s.includes("recadinho") ||
+		s.includes("vinheta") ||
+		s.includes("sequência de sucessos") ||
+		s.includes("flash fm -") ||
+		s.includes("temp_")
+	);
+};
+
 const obterStreamMicrofone = async () => {
 	if (navigator.mediaDevices?.getUserMedia) {
 		const tentativas = [
@@ -622,8 +657,11 @@ export const useLocutorMesa = () => {
 				const audio = monitorAudioRef.current;
 
 				if (novaUrl) {
-					const trocouFaixa = urlFaixaNoArRef.current !== novaUrl;
+					const urlAtualNorm = normalizarUrlAudio(urlFaixaNoArRef.current);
+					const novaUrlNorm = normalizarUrlAudio(novaUrl);
+					const trocouFaixa = !urlAtualNorm || urlAtualNorm !== novaUrlNorm;
 					urlFaixaNoArRef.current = novaUrl;
+
 					if (trocouFaixa) {
 						viradaConsultadaRef.current = false;
 					}
@@ -636,12 +674,15 @@ export const useLocutorMesa = () => {
 								monitorarMusicaNoAr();
 							}
 						};
-						if (trocouFaixa || !audio.src || audio.paused) {
+
+						const eAudioEspecial = ehAudioEspecialIaOuVinheta(novaUrl) || ehAudioEspecialIaOuVinheta(data.faixa_atual.nome);
+
+						if (trocouFaixa || !audio.src) {
 							audio.src = novaUrl;
 							aplicarVolumeMonitor(faderMusicaRef.current);
 							const offset = Math.max(0, data.offset_segundos || 0);
 							const posicionar = () => {
-								if (offset > 2) {
+								if (offset > 2 && !eAudioEspecial) {
 									try {
 										audio.currentTime = offset;
 									} catch {
@@ -662,9 +703,16 @@ export const useLocutorMesa = () => {
 								audio.pause();
 							}
 						} else if (musicaPausadaRef.current) {
-							audio.pause();
+							if (!audio.paused) {
+								audio.pause();
+							}
+						} else if (audio.paused) {
+							// Se é a mesma faixa e apenas estava pausado, NÃO reseta audio.src! Apenas despausa
+							aplicarVolumeMonitor(faderMusicaRef.current);
+							audio.play().catch(() => {});
 						} else if (
 							audio.readyState >= 2 &&
+							!eAudioEspecial &&
 							Math.abs(audio.currentTime - (data.offset_segundos || 0)) > 25
 						) {
 							try {

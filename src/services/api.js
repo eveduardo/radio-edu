@@ -54,14 +54,38 @@ const R2_MIGRATED_GENRES = [
 	"acustico",
 	"anos_70_80_90_internacional",
 	"bossa_nova",
+	"forro_atual",
+	"forro_das_antigas",
 	"instrumental",
 	"moda_viola",
 	"mpb",
 	"pop_nacional",
+	"pop_rock_nacional",
 	"rock_classico",
 	"romanticas",
+	"sertanejo_raiz",
 	"sertanejo_universitario",
 ];
+
+/**
+ * Codifica uma URL de mídia preservando segurança e integridade:
+ * Evita duplas codificações (como %2526 gerado por decodeURI com encodeURI),
+ * preserva o caractere '&' em nomes de artistas/faixas e codifica espaços e acentos.
+ *
+ * @param {string} rawUrl
+ * @returns {string}
+ */
+export const safeEncodeAudioUrl = (rawUrl) => {
+	if (!rawUrl) return "";
+	let clean = String(rawUrl).replace(/%25([0-9a-fA-F]{2})/g, "%$1");
+	clean = clean.replace(/%26/gi, "&");
+	try {
+		clean = decodeURI(clean);
+	} catch {
+		// ignore
+	}
+	return encodeURI(clean);
+};
 
 /**
  * Resolve um caminho relativo retornado pelo backend PHP (ex.: `musicas/faixa.mp3`,
@@ -72,19 +96,16 @@ const R2_MIGRATED_GENRES = [
  */
 export const resolveRadioAssetUrl = (relativePath) => {
 	if (!relativePath) return "";
-	if (/^https?:\/\//i.test(relativePath)) return encodeURI(decodeURI(relativePath));
+	if (/^https?:\/\//i.test(relativePath)) {
+		return safeEncodeAudioUrl(relativePath);
+	}
 
 	const cleanPath = relativePath.replace(/^\/+/, "").replace(/^radio\//, "");
 	if (cleanPath.startsWith("musicas/")) {
 		const r2Path = cleanPath.replace(/^musicas\//, "");
-		const folder = (r2Path.split("/")[0] || "").toLowerCase();
-		if (R2_MIGRATED_GENRES.includes(folder)) {
-			return encodeURI(decodeURI(`${R2_STORAGE_URL}/${r2Path}`));
-		}
-		const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
-		return encodeURI(decodeURI(`${cleanBase}/${cleanPath}`));
+		return safeEncodeAudioUrl(`${R2_STORAGE_URL}/${r2Path}`);
 	}
 
 	const cleanBase = (ENV.apiUrl || "").replace(/\/+$/, "");
-	return encodeURI(decodeURI(`${cleanBase}/${cleanPath}`));
+	return safeEncodeAudioUrl(`${cleanBase}/${cleanPath}`);
 };

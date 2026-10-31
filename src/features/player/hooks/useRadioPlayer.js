@@ -28,18 +28,36 @@ const obterSessaoOuvinte = () => {
 const normalizarUrlAudio = (u) => {
 	if (!u) return "";
 	try {
+		const semQuery = String(u).split("?")[0].split("#")[0];
 		const p = new URL(
-			u,
+			semQuery,
 			typeof window !== "undefined"
 				? window.location.href
 				: "http://localhost",
 		).pathname;
 		return decodeURIComponent(p).toLowerCase().trim();
 	} catch {
-		return decodeURIComponent(u.split("?")[0])
+		return decodeURIComponent(String(u).split("?")[0])
 			.toLowerCase()
 			.trim();
 	}
+};
+
+const ehAudioEspecialIaOuVinheta = (urlOuTitulo) => {
+	if (!urlOuTitulo) return false;
+	const s = String(urlOuTitulo).toLowerCase();
+	return (
+		s.includes("hora_certa") ||
+		s.includes("polly_") ||
+		s.includes("locucao_") ||
+		s.includes("trinca") ||
+		s.includes("recado") ||
+		s.includes("recadinho") ||
+		s.includes("vinheta") ||
+		s.includes("sequência de sucessos") ||
+		s.includes("flash fm -") ||
+		s.includes("temp_")
+	);
 };
 
 export const useRadioPlayer = () => {
@@ -493,19 +511,29 @@ export const useRadioPlayer = () => {
 						? playerDeckBRef.current
 						: playerRef.current;
 
+				const urlAtualNorm = normalizarUrlAudio(urlFaixaAtualRef.current);
+				const novaUrlNorm = normalizarUrlAudio(novaUrl);
 				const mesmoArquivoJaCarregado =
-					normalizarUrlAudio(urlFaixaAtualRef.current) ===
-						normalizarUrlAudio(novaUrl) &&
+					urlAtualNorm === novaUrlNorm &&
 					deckAtivo &&
 					deckAtivo.src;
+
+				// Se um áudio especial da IA ou vinheta já estiver tocando no deck, NUNCA o reinicia
+				const jaTocandoEspecial =
+					ehAudioEspecialIaOuVinheta(novaUrl) &&
+					deckAtivo &&
+					deckAtivo.src &&
+					!deckAtivo.paused &&
+					(normalizarUrlAudio(deckAtivo.src) === novaUrlNorm ||
+						ehAudioEspecialIaOuVinheta(deckAtivo.src));
 
 				if (
 					deckAtivo &&
 					!mesmoArquivoJaCarregado &&
+					!jaTocandoEspecial &&
 					(recarregarAudio ||
 						!urlFaixaAtualRef.current ||
-						normalizarUrlAudio(urlFaixaAtualRef.current) !==
-							normalizarUrlAudio(novaUrl))
+						urlAtualNorm !== novaUrlNorm)
 				) {
 					// Previne recarregar os últimos segundos da faixa que acabou de concluir neste cliente
 					if (
@@ -534,12 +562,8 @@ export const useRadioPlayer = () => {
 
 					const posicionarOffset = () => {
 						const eAudioEspecialSemSeek =
-							novaUrl.includes("locucao_") ||
-							novaUrl.includes("temp_trinca") ||
-							novaUrl.includes("temp_recado") ||
-							novaUrl.includes("recadinhosFlash") ||
-							novaUrl.includes("hora_certa") ||
-							novaUrl.includes("vinhetas/");
+							ehAudioEspecialIaOuVinheta(novaUrl) ||
+							ehAudioEspecialIaOuVinheta(data.faixa_atual?.nome);
 						if (!forcarProxima && offsetExato > 2 && !eAudioEspecialSemSeek) {
 							try {
 								deckAtivo.currentTime = offsetExato;
@@ -612,8 +636,7 @@ export const useRadioPlayer = () => {
 					estaTocandoRef.current &&
 					!deckAtivo.paused &&
 					deckAtivo.readyState >= 2 &&
-					!novaUrl.includes("temp_trinca") &&
-					!novaUrl.includes("hora_certa") &&
+					!ehAudioEspecialIaOuVinheta(novaUrl) &&
 					Math.abs(deckAtivo.currentTime - offsetExato) > 25
 				) {
 					try {
@@ -921,16 +944,7 @@ export const useRadioPlayer = () => {
 
 			// Identifica com precisão cirúrgica se o áudio que está tocando no deck é uma locução da IA ou vinheta
 			const srcAtual = `${deckAtual?.src || ""} ${urlFaixaAtualRef.current || ""} ${tituloMusica || ""}`.toLowerCase();
-			const ehLocucaoAtual =
-				srcAtual.includes("locucao_") ||
-				srcAtual.includes("temp_") ||
-				srcAtual.includes("vinhetas/") ||
-				srcAtual.includes("vinheta") ||
-				srcAtual.includes("hora_certa") ||
-				srcAtual.includes("recadinho") ||
-				srcAtual.includes("recado") ||
-				srcAtual.includes("trinca") ||
-				srcAtual.includes("flash fm -");
+			const ehLocucaoAtual = ehAudioEspecialIaOuVinheta(srcAtual);
 
 			// Locuções e vinhetas (como trinca de sucessos, recados dos ouvintes e hora certa)
 			// NUNCA podem sofrer corte antecipado de 2s! Devem falar até a última sílaba e terminar no evento natural 'ended'.
