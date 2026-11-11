@@ -21,6 +21,7 @@ export const SongRequestModal = ({ isOpen, onClose }) => {
 	const [carregandoAcervo, setCarregandoAcervo] = useState(false);
 	const [generoAtivo, setGeneroAtivo] = useState(null);
 	const [buscaFaixa, setBuscaFaixa] = useState("");
+	const [buscaAcervoGlobal, setBuscaAcervoGlobal] = useState("");
 
 	const [notificacao, setNotificacao] = useState(null);
 
@@ -29,6 +30,7 @@ export const SongRequestModal = ({ isOpen, onClose }) => {
 			setNome("");
 			setRecado("");
 			setFaixaSelecionada(null);
+			setBuscaAcervoGlobal("");
 		}
 	}, [isOpen]);
 
@@ -54,8 +56,30 @@ export const SongRequestModal = ({ isOpen, onClose }) => {
 		}
 		setGeneroAtivo(null);
 		setBuscaFaixa("");
+		setBuscaAcervoGlobal("");
 		setCatalogoAberto(true);
 	};
+
+	const faixasGlobaisFiltradas = useMemo(() => {
+		const t = buscaAcervoGlobal.toLowerCase().trim();
+		if (t.length < 2) return [];
+		const todas = [];
+		for (const [gen, faixas] of Object.entries(mapaGeneros)) {
+			if (Array.isArray(faixas)) {
+				for (const f of faixas) {
+					todas.push({ ...f, genero: f.genero || gen });
+				}
+			}
+		}
+		return todas
+			.filter((f) => {
+				const n = (f.nome || f.titulo || "").toLowerCase();
+				const a = (f.arquivo || f.url || "").toLowerCase();
+				const g = (f.genero || "").toLowerCase();
+				return n.includes(t) || a.includes(t) || g.includes(t);
+			})
+			.slice(0, 50);
+	}, [buscaAcervoGlobal, mapaGeneros]);
 
 	const faixasFiltradas = useMemo(() => {
 		if (!generoAtivo) return [];
@@ -193,7 +217,7 @@ export const SongRequestModal = ({ isOpen, onClose }) => {
 				title={
 					generoAtivo
 						? `📁 ${generoAtivo} (${(mapaGeneros[generoAtivo] || []).length})`
-						: "📁 Escolha o Gênero"
+						: "📁 Acervo Musical"
 				}
 				size="sm"
 				closeLabel="Fechar catálogo"
@@ -211,32 +235,81 @@ export const SongRequestModal = ({ isOpen, onClose }) => {
 				}
 			>
 				{!generoAtivo ? (
-					<div className={styles.gridGenerosOuvinte}>
-						{carregandoAcervo ? (
-							<div className={styles.emptyCatalogMsg}>
-								Carregando gêneros...
-							</div>
-						) : Object.keys(mapaGeneros).length === 0 ? (
-							<div className={styles.emptyCatalogMsg}>
-								Nenhum gênero disponível.
+					<div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+						<Input
+							placeholder="🔍 Digite a música ou banda/cantor..."
+							value={buscaAcervoGlobal}
+							onValueChange={setBuscaAcervoGlobal}
+						/>
+
+						{buscaAcervoGlobal.trim().length >= 2 ? (
+							<div className={styles.listaFaixasScroll}>
+								{faixasGlobaisFiltradas.length === 0 ? (
+									<div className={styles.emptyCatalogMsg}>
+										Nenhuma música encontrada para &ldquo;{buscaAcervoGlobal}&rdquo;.
+									</div>
+								) : (
+									faixasGlobaisFiltradas.map((f) => {
+										const nomeFaixa = f.nome || f.titulo || "Música";
+										return (
+											<button
+												key={f.id || f.arquivo || nomeFaixa}
+												type="button"
+												className={styles.itemFaixaBtn}
+												onClick={() => selecionarFaixa(f)}
+												style={{
+													display: "flex",
+													justifyContent: "space-between",
+													alignItems: "center",
+													gap: "8px",
+												}}
+											>
+												<span
+													style={{
+														overflow: "hidden",
+														textOverflow: "ellipsis",
+														whiteSpace: "nowrap",
+													}}
+												>
+													🎵 {nomeFaixa}
+												</span>
+												<span className={styles.badgeGeneroOuvinte}>
+													{f.genero}
+												</span>
+											</button>
+										);
+									})
+								)}
 							</div>
 						) : (
-							Object.entries(mapaGeneros).map(([genero, faixas]) => (
-								<button
-									key={genero}
-									type="button"
-									className={styles.cardGenBtn}
-									onClick={() => {
-										setGeneroAtivo(genero);
-										setBuscaFaixa("");
-									}}
-								>
-									<span>📁 {genero}</span>
-									<Badge intent="primary" variant="subtle">
-										{faixas.length}
-									</Badge>
-								</button>
-							))
+							<div className={styles.gridGenerosOuvinte}>
+								{carregandoAcervo ? (
+									<div className={styles.emptyCatalogMsg}>
+										Carregando acervo...
+									</div>
+								) : Object.keys(mapaGeneros).length === 0 ? (
+									<div className={styles.emptyCatalogMsg}>
+										Nenhum gênero disponível.
+									</div>
+								) : (
+									Object.entries(mapaGeneros).map(([genero, faixas]) => (
+										<button
+											key={genero}
+											type="button"
+											className={styles.cardGenBtn}
+											onClick={() => {
+												setGeneroAtivo(genero);
+												setBuscaFaixa("");
+											}}
+										>
+											<span>📁 {genero}</span>
+											<Badge intent="primary" variant="subtle">
+												{faixas.length}
+											</Badge>
+										</button>
+									))
+								)}
+							</div>
 						)}
 					</div>
 				) : (

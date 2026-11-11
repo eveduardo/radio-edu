@@ -558,6 +558,18 @@
 	border-color: #38bdf8;
 }
 
+.badgeGeneroOuvinte {
+	font-size: 10px;
+	font-weight: 700;
+	color: #38bdf8;
+	background: rgba(56, 189, 248, 0.12);
+	border: 1px solid rgba(56, 189, 248, 0.25);
+	padding: 2px 7px;
+	border-radius: 4px;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
 .emptyCatalogMsg {
 	grid-column: span 2;
 	font-size: 12px;

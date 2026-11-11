@@ -121,6 +121,7 @@ const LocutorPage = () => {
 	const [modalTrincaAberto, setModalTrincaAberto] = useState(false);
 	const [generoModalAtivo, setGeneroModalAtivo] = useState(null);
 	const [buscaMusicaModal, setBuscaMusicaModal] = useState("");
+	const [buscaAcervoGlobal, setBuscaAcervoGlobal] = useState("");
 	const [vinhetaCategoriaAtiva, setVinhetaCategoriaAtiva] = useState(null);
 	const [buscaVinhetaModal, setBuscaVinhetaModal] = useState("");
 	const [pedidoLeituraAtivo, setPedidoLeituraAtivo] = useState(null);
@@ -285,6 +286,27 @@ const LocutorPage = () => {
 		}
 		return res;
 	}, [gradeCompleta, proximoPrograma]);
+
+	const musicasAcervoGlobalFiltradas = useMemo(() => {
+		const t = buscaAcervoGlobal.toLowerCase().trim();
+		if (t.length < 2) return [];
+		const todas = [];
+		for (const [gen, faixas] of Object.entries(mapaGeneros)) {
+			if (Array.isArray(faixas)) {
+				for (const f of faixas) {
+					todas.push({ ...f, genero: f.genero || gen });
+				}
+			}
+		}
+		return todas
+			.filter((f) => {
+				const n = (f.nome || "").toLowerCase();
+				const a = (f.arquivo || f.url || "").toLowerCase();
+				const g = (f.genero || "").toLowerCase();
+				return n.includes(t) || a.includes(t) || g.includes(t);
+			})
+			.slice(0, 60);
+	}, [buscaAcervoGlobal, mapaGeneros]);
 
 	const faixasDoGeneroFiltradas = useMemo(() => {
 		if (!generoModalAtivo) return [];
@@ -1151,35 +1173,128 @@ const LocutorPage = () => {
 							</div>
 						</div>
 
-						<div className={styles.gridGeneros}>
-							{Object.keys(mapaGeneros).length === 0 ? (
-								<div className={styles.emptyGenerosText}>
-									Nenhum gênero indexado. Clique em &ldquo;⚡ Reindexar&rdquo;
-									para atualizar o acervo.
-								</div>
-							) : (
-								Object.entries(mapaGeneros).map(([nomeGenero, faixas]) => {
-									if (!Array.isArray(faixas) || faixas.length === 0)
-										return null;
-									return (
-										<button
-											key={nomeGenero}
-											type="button"
-											className={styles.cardGeneroBtn}
-											onClick={() => {
-												setGeneroModalAtivo(nomeGenero);
-												setBuscaMusicaModal("");
-											}}
-										>
-											<div className={styles.generoNome}>📁 {nomeGenero}</div>
-											<span className={styles.generoBadgeCount}>
-												{faixas.length}
-											</span>
-										</button>
-									);
-								})
-							)}
+						<div className={styles.boxBuscaAcervoGlobal}>
+							<input
+								type="text"
+								className={styles.inputBuscaAcervoGlobal}
+								placeholder="🔍 Buscar música ou cantor em todo o acervo..."
+								value={buscaAcervoGlobal}
+								onChange={(e) => setBuscaAcervoGlobal(e.target.value)}
+							/>
 						</div>
+
+						{buscaAcervoGlobal.trim().length >= 2 ? (
+							<div className={styles.containerResultadosBuscaGlobal}>
+								{musicasAcervoGlobalFiltradas.length === 0 ? (
+									<div className={styles.emptyPanelText}>
+										Nenhuma música encontrada para &ldquo;{buscaAcervoGlobal}&rdquo;.
+									</div>
+								) : (
+									musicasAcervoGlobalFiltradas.map((faixa) => (
+										<div
+											key={faixa.id || faixa.arquivo || faixa.nome}
+											className={styles.itemMusicaLinha}
+										>
+											<div
+												style={{
+													display: "flex",
+													flexDirection: "column",
+													gap: "2px",
+													overflow: "hidden",
+													flex: 1,
+													marginRight: "8px",
+												}}
+											>
+												<span
+													className={styles.itemMusicaTitulo}
+													title={faixa.nome}
+												>
+													🎵 {faixa.nome}
+												</span>
+												<span className={styles.badgeGeneroChip}>
+													📁 {faixa.genero}
+												</span>
+											</div>
+											<div className={styles.botoesAcaoPedido}>
+												<button
+													type="button"
+													className={styles.btnAcervoFila}
+													title="Adicionar à Fila do Programa (Playlist do Locutor)"
+													onClick={async (e) => {
+														e.stopPropagation();
+														const idFaixa =
+															faixa.id || faixa.arquivo || faixa.nome;
+														setAdicionandoFilaId(idFaixa);
+														await adicionarFaixaFila({
+															...faixa,
+															genero: faixa.genero || "Acervo",
+														});
+														setTimeout(
+															() => setAdicionandoFilaId(null),
+															1200,
+														);
+													}}
+												>
+													{adicionandoFilaId ===
+													(faixa.id || faixa.arquivo || faixa.nome)
+														? "✓ Na fila"
+														: "➕ Fila"}
+												</button>
+												<button
+													type="button"
+													className={styles.btnAcervoAgendar}
+													onClick={() => {
+														agendarFaixaAcervo(faixa, false);
+													}}
+												>
+													▶ Agendar
+												</button>
+												<button
+													type="button"
+													className={styles.btnAcervoTocarAgora}
+													disabled={transicaoEmAndamento}
+													onClick={() => {
+														agendarFaixaAcervo(faixa, true);
+													}}
+												>
+													⏭ Tocar Agora
+												</button>
+											</div>
+										</div>
+									))
+								)}
+							</div>
+						) : (
+							<div className={styles.gridGeneros}>
+								{Object.keys(mapaGeneros).length === 0 ? (
+									<div className={styles.emptyGenerosText}>
+										Nenhum gênero indexado. Clique em &ldquo;⚡ Reindexar&rdquo;
+										para atualizar o acervo.
+									</div>
+								) : (
+									Object.entries(mapaGeneros).map(([nomeGenero, faixas]) => {
+										if (!Array.isArray(faixas) || faixas.length === 0)
+											return null;
+										return (
+											<button
+												key={nomeGenero}
+												type="button"
+												className={styles.cardGeneroBtn}
+												onClick={() => {
+													setGeneroModalAtivo(nomeGenero);
+													setBuscaMusicaModal("");
+												}}
+											>
+												<div className={styles.generoNome}>📁 {nomeGenero}</div>
+												<span className={styles.generoBadgeCount}>
+													{faixas.length}
+												</span>
+											</button>
+										);
+									})
+								)}
+							</div>
+						)}
 					</div>
 				</div>
 			</div>

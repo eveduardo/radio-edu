@@ -1053,6 +1053,47 @@
 	box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
 }
 
+.boxBuscaAcervoGlobal {
+	margin-bottom: 6px;
+	flex-shrink: 0;
+}
+
+.inputBuscaAcervoGlobal {
+	width: 100%;
+	box-sizing: border-box;
+	background: #0b111c;
+	border: 1px solid #2d3d54;
+	border-radius: 6px;
+	color: #fff;
+	padding: 5px 8px;
+	font-size: 11px;
+	outline: none;
+	transition: border-color 0.2s ease;
+}
+
+.inputBuscaAcervoGlobal:focus {
+	border-color: #ffb703;
+}
+
+.containerResultadosBuscaGlobal {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-right: 2px;
+}
+
+.badgeGeneroChip {
+	font-size: 9.5px;
+	font-weight: 700;
+	color: #38bdf8;
+	background: rgba(56, 189, 248, 0.12);
+	padding: 2px 6px;
+	border-radius: 4px;
+	white-space: nowrap;
+}
+
 .badgePedidosCount {
 	background: rgba(245, 158, 11, 0.2);
 	color: #fbbf24;
