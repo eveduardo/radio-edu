@@ -9,8 +9,9 @@ import styles from "../pages/RadioPlayerPage.module.css";
  * @param {Object} props
  * @param {boolean} props.isOpen
  * @param {() => void} props.onClose
+ * @param {Object} [props.initialSong]
  */
-export const SongRequestModal = ({ isOpen, onClose }) => {
+export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 	const [nome, setNome] = useState("");
 	const [recado, setRecado] = useState("");
 	const [faixaSelecionada, setFaixaSelecionada] = useState(null);
@@ -29,10 +30,17 @@ export const SongRequestModal = ({ isOpen, onClose }) => {
 		if (isOpen) {
 			setNome("");
 			setRecado("");
-			setFaixaSelecionada(null);
+			if (initialSong) {
+				setFaixaSelecionada({
+					arquivo: initialSong.arquivo || "",
+					titulo: initialSong.titulo || initialSong.nome || "Música",
+				});
+			} else {
+				setFaixaSelecionada(null);
+			}
 			setBuscaAcervoGlobal("");
 		}
-	}, [isOpen]);
+	}, [isOpen, initialSong]);
 
 	const carregarAcervo = async () => {
 		setCarregandoAcervo(true);

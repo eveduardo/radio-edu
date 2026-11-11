@@ -781,3 +781,205 @@
 	background: rgba(255, 255, 255, 0.15);
 }
 
+/* Utilidades do Ouvinte: Favoritos, WhatsApp e Sleep Timer */
+.linhaTituloFavorito {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	margin: 2px 0 3px;
+}
+
+.linhaTituloFavorito h2 {
+	margin: 0;
+	flex: 1;
+	text-align: center;
+}
+
+.btnFavoritar {
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 50%;
+	width: 28px;
+	height: 28px;
+	min-width: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 13px;
+	cursor: pointer;
+	color: #cbd5e1;
+	transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+	flex-shrink: 0;
+}
+
+.btnFavoritar:hover {
+	background: rgba(239, 68, 68, 0.2);
+	border-color: #ef4444;
+	transform: scale(1.1);
+}
+
+.btnFavoritarAtivo {
+	background: rgba(239, 68, 68, 0.25);
+	border-color: #ef4444;
+	color: #ef4444;
+	animation: pulsoFav 0.3s ease;
+}
+
+@keyframes pulsoFav {
+	0% {
+		transform: scale(0.8);
+	}
+	50% {
+		transform: scale(1.3);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+.barraUtilidadesOuvinte {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	margin: 6px 0 4px;
+	flex-wrap: wrap;
+}
+
+.btnUtilOuvinte {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 4px 10px;
+	font-size: 10.5px;
+	font-weight: 700;
+	border-radius: 14px;
+	border: 1px solid transparent;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	background: rgba(255, 255, 255, 0.07);
+	color: #cbd5e1;
+}
+
+.btnUtilOuvinte:hover {
+	transform: translateY(-1px);
+}
+
+.btnUtilZap {
+	background: rgba(37, 211, 102, 0.12);
+	border-color: rgba(37, 211, 102, 0.35);
+	color: #25d366;
+}
+
+.btnUtilZap:hover {
+	background: rgba(37, 211, 102, 0.22);
+	box-shadow: 0 0 10px rgba(37, 211, 102, 0.3);
+}
+
+.btnUtilTimer {
+	background: rgba(99, 102, 241, 0.12);
+	border-color: rgba(99, 102, 241, 0.35);
+	color: #a5b4fc;
+}
+
+.btnUtilTimer:hover {
+	background: rgba(99, 102, 241, 0.22);
+	box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+.btnUtilTimerAtivo {
+	background: rgba(245, 158, 11, 0.2);
+	border-color: #f59e0b;
+	color: #fbbf24;
+	animation: pulsoTimer 2s infinite;
+}
+
+@keyframes pulsoTimer {
+	0% {
+		box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+	}
+	70% {
+		box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+	}
+}
+
+.btnUtilFavs {
+	background: rgba(244, 63, 94, 0.12);
+	border-color: rgba(244, 63, 94, 0.35);
+	color: #fda4af;
+}
+
+.btnUtilFavs:hover {
+	background: rgba(244, 63, 94, 0.22);
+	box-shadow: 0 0 10px rgba(244, 63, 94, 0.3);
+}
+
+.btnOpcaoTimer {
+	background: #1c2836;
+	border: 1px solid #2d3d52;
+	border-radius: 8px;
+	color: #fff;
+	padding: 10px;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+	transition:
+		background 0.15s,
+		border-color 0.15s;
+	width: 100%;
+	text-align: center;
+}
+
+.btnOpcaoTimer:hover {
+	background: #233448;
+	border-color: #38bdf8;
+}
+
+.itemFavoritaLinha {
+	background: #172230;
+	border: 1px solid #24354a;
+	border-radius: 8px;
+	padding: 8px 10px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.itemFavTitulo {
+	font-size: 11px;
+	color: #f1f5f9;
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	text-align: left;
+}
+
+.btnFavPedir {
+	background: linear-gradient(135deg, #ffb703, #fb8500);
+	color: #0d1b2a;
+	border: none;
+	font-size: 10px;
+	font-weight: 700;
+	padding: 4px 8px;
+	border-radius: 5px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.btnFavRemover {
+	background: rgba(239, 68, 68, 0.15);
+	border: 1px solid rgba(239, 68, 68, 0.3);
+	color: #ef4444;
+	font-size: 11px;
+	padding: 4px 6px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+
