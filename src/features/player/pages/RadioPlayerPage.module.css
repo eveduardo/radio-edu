@@ -584,3 +584,188 @@
 	line-height: 1.45;
 }
 
+.btnTopoCompartilhar {
+	position: fixed;
+	top: 14px;
+	right: 14px;
+	z-index: 100;
+	background: rgba(13, 27, 42, 0.65);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	color: #fff;
+	padding: 8px 14px;
+	border-radius: 20px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.3px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+	transition: all 0.2s ease;
+	user-select: none;
+}
+
+.btnTopoCompartilhar:hover {
+	background: rgba(13, 27, 42, 0.85);
+	border-color: #ffb703;
+	transform: translateY(-1px);
+	box-shadow: 0 6px 20px rgba(255, 183, 3, 0.3);
+}
+
+.btnTopoCompartilhar:active {
+	transform: scale(0.96);
+}
+
+.iconeQrTopo {
+	font-size: 15px;
+}
+
+/* Modal de Compartilhamento / QR Code */
+.shareModalBody {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: 14px;
+	padding: 4px 0 10px;
+}
+
+.shareModalSub {
+	font-size: 12px;
+	color: #cbd5e1;
+	margin: 0;
+	line-height: 1.45;
+}
+
+.qrcodeWrapper {
+	background: #ffffff;
+	padding: 14px;
+	border-radius: 18px;
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
+}
+
+.qrcodeImg {
+	width: 190px;
+	height: 190px;
+	display: block;
+	border-radius: 8px;
+}
+
+.qrcodeBadgeRadio {
+	margin-top: 8px;
+	color: #0b1320;
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
+}
+
+.linkCopiarBox {
+	display: flex;
+	align-items: center;
+	background: #090f19;
+	border: 1px solid #1e293b;
+	border-radius: 12px;
+	padding: 4px 6px 4px 12px;
+	width: 100%;
+	gap: 6px;
+}
+
+.inputLinkCompartilhar {
+	flex: 1;
+	background: transparent;
+	border: none;
+	color: #94a3b8;
+	font-size: 11px;
+	font-family: inherit;
+	outline: none;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.btnCopiarLink {
+	background: #1e293b;
+	border: 1px solid #334155;
+	color: #f1f5f9;
+	font-size: 11px;
+	font-weight: 700;
+	padding: 8px 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	transition: all 0.2s ease;
+	white-space: nowrap;
+}
+
+.btnCopiarLink:hover {
+	background: #ffb703;
+	color: #0b0e14;
+	border-color: #ffb703;
+}
+
+.btnCopiarLinkCopiado {
+	background: #10b981 !important;
+	color: #fff !important;
+	border-color: #10b981 !important;
+}
+
+.botoesCompartilharAcoes {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	gap: 8px;
+}
+
+.btnAcaoWhatsapp {
+	width: 100%;
+	background: linear-gradient(135deg, #25D366, #128C7E);
+	border: none;
+	color: #ffffff;
+	padding: 11px 16px;
+	border-radius: 12px;
+	font-size: 13px;
+	font-weight: 700;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+	transition: all 0.2s ease;
+}
+
+.btnAcaoWhatsapp:hover {
+	filter: brightness(1.08);
+	transform: translateY(-1px);
+}
+
+.btnAcaoNativo {
+	width: 100%;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	color: #f1f5f9;
+	padding: 9px 16px;
+	border-radius: 12px;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	transition: all 0.2s ease;
+}
+
+.btnAcaoNativo:hover {
+	background: rgba(255, 255, 255, 0.15);
+}
+

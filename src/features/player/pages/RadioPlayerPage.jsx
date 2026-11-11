@@ -8,6 +8,7 @@ import {
 import { VinylDisc } from "../components/VinylDisc";
 import { HorizontalVuMeter } from "../components/HorizontalVuMeter";
 import { SongRequestModal } from "../components/SongRequestModal";
+import { ShareModal } from "../components/ShareModal";
 import styles from "./RadioPlayerPage.module.css";
 
 const getVolumeIcon = (val) => {
@@ -18,6 +19,7 @@ const getVolumeIcon = (val) => {
 
 const RadioPlayerContent = () => {
 	const [modalPedidoAberto, setModalPedidoAberto] = useState(false);
+	const [modalCompartilharAberto, setModalCompartilharAberto] = useState(false);
 
 	const {
 		estaTocando,
@@ -44,6 +46,16 @@ const RadioPlayerContent = () => {
 			<div className={styles.logoTopo}>
 				<img src="/img/logoFM.jpg" alt="Flash FM" />
 			</div>
+
+			<button
+				type="button"
+				className={styles.btnTopoCompartilhar}
+				onClick={() => setModalCompartilharAberto(true)}
+				title="Compartilhar rádio com QR Code"
+			>
+				<span className={styles.iconeQrTopo}>📱</span>
+				<span>QR Code</span>
+			</button>
 
 			<div className={clsx(styles.cardRadio, recolhido && styles.recolhido)}>
 				<button
@@ -148,6 +160,11 @@ const RadioPlayerContent = () => {
 			<SongRequestModal
 				isOpen={modalPedidoAberto}
 				onClose={() => setModalPedidoAberto(false)}
+			/>
+
+			<ShareModal
+				isOpen={modalCompartilharAberto}
+				onClose={() => setModalCompartilharAberto(false)}
 			/>
 		</div>
 	);
