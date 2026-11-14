@@ -185,8 +185,8 @@ const RadioPlayerContent = () => {
 				onClick={() => setModalCompartilharAberto(true)}
 				title="Compartilhar rádio com QR Code"
 			>
-				<span className={styles.iconeQrTopo}>📱</span>
-				<span>QR Code</span>
+				<span className={styles.iconeQrTopo}>📲</span>
+				<span>QR CODE</span>
 			</button>
 
 			<div className={clsx(styles.cardRadio, recolhido && styles.recolhido)}>
