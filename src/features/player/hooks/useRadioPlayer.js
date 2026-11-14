@@ -29,24 +29,27 @@ const normalizarUrlAudio = (u) => {
 	if (!u) return "";
 	try {
 		const semQuery = String(u).split("?")[0].split("#")[0];
-		const p = new URL(
+		let p = new URL(
 			semQuery,
 			typeof window !== "undefined"
 				? window.location.href
 				: "http://localhost",
 		).pathname;
 		try {
-			return decodeURIComponent(p).toLowerCase().trim();
+			p = decodeURIComponent(p).toLowerCase().trim();
 		} catch {
-			return p.toLowerCase().trim();
+			p = p.toLowerCase().trim();
 		}
+		return p.replace(/^\/(?:radio|flash|app)\//, "/");
 	} catch {
 		try {
-			return decodeURIComponent(String(u).split("?")[0])
+			let p = decodeURIComponent(String(u).split("?")[0])
 				.toLowerCase()
 				.trim();
+			return p.replace(/^\/(?:radio|flash|app)\//, "/");
 		} catch {
-			return String(u).split("?")[0].toLowerCase().trim();
+			let p = String(u).split("?")[0].toLowerCase().trim();
+			return p.replace(/^\/(?:radio|flash|app)\//, "/");
 		}
 	}
 };
@@ -93,6 +96,8 @@ export const useRadioPlayer = () => {
 	const audioCtxRef = useRef(null);
 	const analyserRef = useRef(null);
 	const gainNodeMusicaRef = useRef(null);
+	const gainNodeDeckARef = useRef(null);
+	const gainNodeDeckBRef = useRef(null);
 	const gainNodeVozRef = useRef(null);
 	const dataArrayRef = useRef(null);
 	const sourceNodeMusicaRef = useRef(null);
@@ -173,6 +178,23 @@ export const useRadioPlayer = () => {
 					gainNodeMusica.gain.setValueAtTime(gainNodeMusica.gain.value, agora);
 				}
 				gainNodeMusica.gain.linearRampToValueAtTime(volumeFinalMusica, agora + 0.08);
+
+				// Chaveamento rigoroso do ganho individual por deck (blindagem total contra vazamento de áudio)
+				const gA = gainNodeDeckARef.current;
+				const gB = gainNodeDeckBRef.current;
+				if (gA && gB) {
+					if (deckAtivoRef.current === "A") {
+						gA.gain.setValueAtTime(1.0, agora);
+						if (!emTransicaoAntecipadaRef.current && !emTransicaoSuaveRef.current) {
+							gB.gain.setValueAtTime(0.0, agora);
+						}
+					} else {
+						gB.gain.setValueAtTime(1.0, agora);
+						if (!emTransicaoAntecipadaRef.current && !emTransicaoSuaveRef.current) {
+							gA.gain.setValueAtTime(0.0, agora);
+						}
+					}
+				}
 			} catch {
 				gainNodeMusica.gain.value = volumeFinalMusica;
 			}
@@ -196,7 +218,7 @@ export const useRadioPlayer = () => {
 			}
 		}
 
-		if (deckOcioso && !emTransicaoAntecipadaRef.current) {
+		if (deckOcioso && !emTransicaoAntecipadaRef.current && !emTransicaoSuaveRef.current) {
 			try {
 				deckOcioso.volume = 0;
 			} catch {
@@ -280,17 +302,31 @@ export const useRadioPlayer = () => {
 				ctx.resume().catch(() => {});
 			}
 
+			// Cria nós de ganho dedicados por deck para blindagem absoluta contra vazamento
+			if (ctx && gainNodeMusicaRef.current) {
+				if (!gainNodeDeckARef.current) {
+					const gA = ctx.createGain();
+					gA.connect(gainNodeMusicaRef.current);
+					gainNodeDeckARef.current = gA;
+				}
+				if (!gainNodeDeckBRef.current) {
+					const gB = ctx.createGain();
+					gB.connect(gainNodeMusicaRef.current);
+					gainNodeDeckBRef.current = gB;
+				}
+			}
+
 			// Conecta os decks <audio> ao grafo Web Audio para análise real de frequência (UV) e crossfade
 			const playerA = playerRef.current;
 			if (
 				ctx &&
 				playerA &&
 				!sourceNodeMusicaRef.current &&
-				gainNodeMusicaRef.current
+				gainNodeDeckARef.current
 			) {
 				try {
 					const source = ctx.createMediaElementSource(playerA);
-					source.connect(gainNodeMusicaRef.current);
+					source.connect(gainNodeDeckARef.current);
 					sourceNodeMusicaRef.current = source;
 				} catch {
 					// Já conectado anteriormente
@@ -302,11 +338,11 @@ export const useRadioPlayer = () => {
 				ctx &&
 				playerB &&
 				!sourceNodeMusicaBRef.current &&
-				gainNodeMusicaRef.current
+				gainNodeDeckBRef.current
 			) {
 				try {
 					const sourceB = ctx.createMediaElementSource(playerB);
-					sourceB.connect(gainNodeMusicaRef.current);
+					sourceB.connect(gainNodeDeckBRef.current);
 					sourceNodeMusicaBRef.current = sourceB;
 				} catch {
 					// Já conectado anteriormente
@@ -535,8 +571,9 @@ export const useRadioPlayer = () => {
 
 				const urlAtualNorm = normalizarUrlAudio(urlFaixaAtualRef.current);
 				const novaUrlNorm = normalizarUrlAudio(novaUrl);
+				const deckSrcNorm = deckAtivo && deckAtivo.src ? normalizarUrlAudio(deckAtivo.src) : "";
 				const mesmoArquivoJaCarregado =
-					urlAtualNorm === novaUrlNorm &&
+					(urlAtualNorm === novaUrlNorm || deckSrcNorm === novaUrlNorm) &&
 					deckAtivo &&
 					deckAtivo.src;
 
@@ -546,7 +583,7 @@ export const useRadioPlayer = () => {
 					deckAtivo &&
 					deckAtivo.src &&
 					!deckAtivo.paused &&
-					(normalizarUrlAudio(deckAtivo.src) === novaUrlNorm ||
+					(deckSrcNorm === novaUrlNorm ||
 						ehAudioEspecialIaOuVinheta(deckAtivo.src));
 
 				if (
@@ -574,16 +611,6 @@ export const useRadioPlayer = () => {
 					urlFaixaAtualRef.current = novaUrl;
 					deckAtivo.muted = false;
 					deckAtivo.src = novaUrl;
-
-					// Pré-carrega a próxima faixa no deck ocioso para virada antecipada suave
-					if (
-						deckOcioso &&
-						proximaUrlRef.current &&
-						deckOcioso.src !== proximaUrlRef.current
-					) {
-						deckOcioso.src = proximaUrlRef.current;
-						deckOcioso.preload = "auto";
-					}
 
 					aplicarVolumesMesa();
 
@@ -822,11 +849,10 @@ export const useRadioPlayer = () => {
 			pingListenerHeartbeat(obterSessaoOuvinte()).catch(() => {});
 			ativarWakeLock();
 
-			// Destrava elementos auxiliares e deck B no gesto do usuário (requisito para background no iOS e Android)
-			playerVozRef.current?.play().catch(() => {});
-			playerHoraRef.current?.play().catch(() => {});
-			playerVinhetaRef.current?.play().catch(() => {});
-			playerDeckBRef.current?.play().then(() => playerDeckBRef.current?.pause()).catch(() => {});
+			const ctx = audioCtxRef.current;
+			if (ctx && ctx.state === "suspended") {
+				ctx.resume().catch(() => {});
+			}
 
 			if (deckAtivo) {
 				deckAtivo.muted = false;
@@ -1027,6 +1053,8 @@ export const useRadioPlayer = () => {
 						try {
 							deckAtual.currentTime = 0;
 							deckAtual.volume = 0;
+							deckAtual.removeAttribute("src");
+							deckAtual.load();
 						} catch {
 							// ignore
 						}
@@ -1541,16 +1569,28 @@ export const useRadioPlayer = () => {
 	}, [aplicarVolumesMesa, sincronizarRadio]);
 
 	const handleTrackError = useCallback((e) => {
-		if (emTransicaoSuaveRef.current) return;
+		const deckAtual =
+			deckAtivoRef.current === "A"
+				? playerRef.current
+				: playerDeckBRef.current;
+		// Descarta qualquer erro que não venha estritamente do deck que está tocando no ar
+		if (
+			!e?.target ||
+			e.target !== deckAtual ||
+			!e.target.src ||
+			(typeof window !== "undefined" && e.target.src === window.location.href)
+		) {
+			return;
+		}
+		if (emTransicaoSuaveRef.current || emTransicaoAntecipadaRef.current) return;
 		console.warn(
-			"[handleTrackError] Falha no deck de áudio:",
+			"[handleTrackError] Falha no deck de áudio ativo:",
 			e?.target?.error?.code,
 			e?.target?.error?.message,
 			e?.target?.src,
 		);
 		setStatusTexto("Reconectando áudio...");
-		// Reconecta o áudio sem forçar pulo prematuro de música
-		setTimeout(() => sincronizarRadio(false, { recarregarAudio: true }), 2500);
+		setTimeout(() => sincronizarRadio(false), 3000);
 	}, [sincronizarRadio]);
 
 	return {
