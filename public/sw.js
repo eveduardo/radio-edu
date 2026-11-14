@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flash-fm-pwa-v13';
+const CACHE_NAME = 'flash-fm-pwa-v14';
 const ASSETS = [
   '/',
   '/index.html',

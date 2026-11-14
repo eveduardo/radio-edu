@@ -12,6 +12,7 @@ export const fetchRadioSync = async ({
 	forcarProxima = false,
 	faixaConcluida = false,
 	sessaoOuvinte = null,
+	duracaoCliente = null,
 } = {}) => {
 	const params = { t: Date.now() };
 	if (forcarProxima) {
@@ -22,6 +23,9 @@ export const fetchRadioSync = async ({
 	}
 	if (sessaoOuvinte) {
 		params.sessao_ouvinte = sessaoOuvinte;
+	}
+	if (duracaoCliente && Number.isFinite(duracaoCliente) && duracaoCliente > 20) {
+		params.duracao_cliente = Math.round(duracaoCliente);
 	}
 
 	try {

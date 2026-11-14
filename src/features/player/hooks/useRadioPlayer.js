@@ -83,6 +83,7 @@ export const useRadioPlayer = () => {
 	const playerDeckBRef = useRef(null); // Deck B
 	const deckAtivoRef = useRef("A");
 	const emTransicaoAntecipadaRef = useRef(false);
+	const transicaoDisparadaRef = useRef(false);
 
 	const playerHoraRef = useRef(null);
 	const playerVozRef = useRef(null);
@@ -465,7 +466,20 @@ export const useRadioPlayer = () => {
 
 			try {
 				const sessaoOuvinte = estaTocandoRef.current ? obterSessaoOuvinte() : null;
-				const data = await fetchRadioSync({ forcarProxima, faixaConcluida, sessaoOuvinte });
+				const deckAtivoPre =
+					deckAtivoRef.current === "A"
+						? playerRef.current
+						: playerDeckBRef.current;
+				const duracaoCliente =
+					deckAtivoPre && Number.isFinite(deckAtivoPre.duration) && deckAtivoPre.duration > 20
+						? Math.round(deckAtivoPre.duration)
+						: null;
+				const data = await fetchRadioSync({
+					forcarProxima,
+					faixaConcluida,
+					sessaoOuvinte,
+					duracaoCliente,
+				});
 
 				if (!data || data.error) {
 					setTituloMusica(data?.error || "Sem programação");
@@ -550,7 +564,12 @@ export const useRadioPlayer = () => {
 					) {
 						return data;
 					}
-					faixaRecemConcluidaRef.current = null;
+					if (
+						faixaRecemConcluidaRef.current &&
+						normalizarUrlAudio(novaUrl) !== normalizarUrlAudio(faixaRecemConcluidaRef.current)
+					) {
+						faixaRecemConcluidaRef.current = null;
+					}
 
 					urlFaixaAtualRef.current = novaUrl;
 					deckAtivo.muted = false;
@@ -638,20 +657,6 @@ export const useRadioPlayer = () => {
 				} else if (deckAtivo && pausadoNaMesa) {
 					if (!deckAtivo.paused) {
 						deckAtivo.pause();
-					}
-				} else if (
-					deckAtivo &&
-					estaTocandoRef.current &&
-					!deckAtivo.paused &&
-					deckAtivo.readyState >= 3 &&
-					!ehAudioEspecialIaOuVinheta(novaUrl) &&
-					deckAtivo.currentTime > 5 &&
-					Math.abs(deckAtivo.currentTime - offsetExato) > 30
-				) {
-					try {
-						deckAtivo.currentTime = offsetExato;
-					} catch {
-						// ignore
 					}
 				}
 
@@ -929,6 +934,7 @@ export const useRadioPlayer = () => {
 			if (
 				!estaTocandoRef.current ||
 				emTransicaoAntecipadaRef.current ||
+				transicaoDisparadaRef.current ||
 				emTransicaoSuaveRef.current ||
 				vinhetaEmExecucaoRef.current ||
 				estadoMesaRef.current?.musica_tocando === false
@@ -949,7 +955,7 @@ export const useRadioPlayer = () => {
 				!deckAtual ||
 				deckAtual.paused ||
 				!Number.isFinite(deckAtual.duration) ||
-				deckAtual.duration < 3
+				deckAtual.duration < 10
 			) {
 				return;
 			}
@@ -965,9 +971,11 @@ export const useRadioPlayer = () => {
 			}
 
 			const restante = deckAtual.duration - deckAtual.currentTime;
-			// Quando faltar <= 2.0s para o término da música, já entra a próxima faixa!
-			if (restante <= 2.0 && restante > 0) {
+			// Quando faltar <= 2.2s para o término da música, já entra a próxima faixa!
+			if (restante <= 2.2 && restante > 0 && proximaUrlRef.current) {
+				transicaoDisparadaRef.current = true;
 				emTransicaoAntecipadaRef.current = true;
+				faixaRecemConcluidaRef.current = urlFaixaAtualRef.current;
 				const proximaUrl = proximaUrlRef.current;
 				const volMaster = Math.max(0, Math.min(1, volumeMasterRef.current));
 				const volMesa =
@@ -1029,10 +1037,11 @@ export const useRadioPlayer = () => {
 						urlFaixaAtualRef.current = proximaUrl;
 					}
 					emTransicaoAntecipadaRef.current = false;
+					transicaoDisparadaRef.current = false;
 					aplicarVolumesMesa();
 
 					// Notifica o servidor para atualizar a programação
-					sincronizarRadio(false);
+					sincronizarRadio(false, { faixaConcluida: true });
 				}, 2100);
 			}
 		}, 250);
@@ -1528,32 +1537,7 @@ export const useRadioPlayer = () => {
 		setStatusTexto("Carregando próxima música...");
 
 		// Notifica o servidor que a faixa foi concluída (faixaConcluida: true)
-		sincronizarRadio(false, { faixaConcluida: true }).then((data) => {
-			const urlServidor = resolveRadioAssetUrl(data?.faixa_atual?.url || "");
-			const deck =
-				deckAtivoRef.current === "A"
-					? playerRef.current
-					: playerDeckBRef.current;
-			// Se o servidor ainda respondeu com a faixa que acabou de concluir, descarta
-			if (
-				urlServidor &&
-				faixaRecemConcluidaRef.current &&
-				normalizarUrlAudio(urlServidor) === normalizarUrlAudio(faixaRecemConcluidaRef.current)
-			) {
-				return;
-			}
-			if (
-				deck &&
-				urlServidor &&
-				normalizarUrlAudio(urlServidor) !==
-					normalizarUrlAudio(urlFaixaAtualRef.current) &&
-				estaTocandoRef.current
-			) {
-				urlFaixaAtualRef.current = urlServidor;
-				deck.src = urlServidor;
-				deck.play().catch(() => {});
-			}
-		});
+		sincronizarRadio(false, { faixaConcluida: true });
 	}, [aplicarVolumesMesa, sincronizarRadio]);
 
 	const handleTrackError = useCallback((e) => {
