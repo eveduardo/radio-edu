@@ -4,14 +4,22 @@ import { fetchGenresCatalog, submitSongRequest } from "@/services";
 import styles from "../pages/RadioPlayerPage.module.css";
 
 /**
- * Modal de Pedido de Música + Catálogo de Acervo por Gênero usando `@jposawa/ronin-ui`.
+ * Modal de Pedido de Música + Catálogo de Acervo por Gênero com Filtro da Grade.
  *
  * @param {Object} props
  * @param {boolean} props.isOpen
  * @param {() => void} props.onClose
  * @param {Object} [props.initialSong]
+ * @param {Object} [props.programaAtual]
+ * @param {Object} [props.proximoPrograma]
  */
-export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
+export const SongRequestModal = ({
+	isOpen,
+	onClose,
+	initialSong = null,
+	programaAtual = null,
+	proximoPrograma = null,
+}) => {
 	const [nome, setNome] = useState("");
 	const [recado, setRecado] = useState("");
 	const [faixaSelecionada, setFaixaSelecionada] = useState(null);
@@ -26,6 +34,57 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 
 	const [notificacao, setNotificacao] = useState(null);
 
+	// Gêneros e pastas do programa atual para validação e destaque
+	const generosDoPrograma = useMemo(() => {
+		if (!programaAtual?.generos_prioritarios || !Array.isArray(programaAtual.generos_prioritarios)) {
+			return [];
+		}
+		return programaAtual.generos_prioritarios.map((g) =>
+			g.toLowerCase().trim().replace(/[_-]/g, " "),
+		);
+	}, [programaAtual]);
+
+	const pastasDoPrograma = useMemo(() => {
+		if (!programaAtual?.pastas_musicas || !Array.isArray(programaAtual.pastas_musicas)) {
+			return [];
+		}
+		return programaAtual.pastas_musicas.map((p) =>
+			p.toLowerCase().trim().replace(/[_-]/g, ""),
+		);
+	}, [programaAtual]);
+
+	const faixaCombinaComPrograma = (faixa) => {
+		if (generosDoPrograma.length === 0 && pastasDoPrograma.length === 0) {
+			return true;
+		}
+		const gFaixa = (faixa.genero || "").toLowerCase().trim().replace(/[_-]/g, " ");
+		const aFaixa = (faixa.arquivo || faixa.url || "").toLowerCase().trim().replace(/[_-]/g, "");
+
+		const matchGen = generosDoPrograma.some(
+			(gp) => gFaixa.includes(gp) || gp.includes(gFaixa),
+		);
+		if (matchGen) return true;
+
+		const matchPasta = pastasDoPrograma.some((pm) => aFaixa.includes(pm));
+		return matchPasta;
+	};
+
+	const generoCombinaComPrograma = (generoNome) => {
+		if (generosDoPrograma.length === 0 && pastasDoPrograma.length === 0) {
+			return true;
+		}
+		const genNorm = generoNome.toLowerCase().trim().replace(/[_-]/g, " ");
+		const matchGen = generosDoPrograma.some(
+			(gp) => genNorm.includes(gp) || gp.includes(genNorm),
+		);
+		if (matchGen) return true;
+
+		const genSemEspaco = genNorm.replace(/\s+/g, "");
+		return pastasDoPrograma.some(
+			(pm) => genSemEspaco.includes(pm) || pm.includes(genSemEspaco),
+		);
+	};
+
 	useEffect(() => {
 		if (isOpen) {
 			setNome("");
@@ -34,6 +93,7 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 				setFaixaSelecionada({
 					arquivo: initialSong.arquivo || "",
 					titulo: initialSong.titulo || initialSong.nome || "Música",
+					genero: initialSong.genero || "",
 				});
 			} else {
 				setFaixaSelecionada(null);
@@ -100,9 +160,21 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 	}, [buscaFaixa, generoAtivo, mapaGeneros]);
 
 	const selecionarFaixa = (faixa) => {
+		const combina = faixaCombinaComPrograma(faixa);
+		if (!combina && programaAtual) {
+			const estiloProg = programaAtual.generos_prioritarios?.join(", ") || "específico";
+			setNotificacao({
+				icone: "⚠️",
+				titulo: "Estilo Incompatível",
+				mensagem: `A faixa "${faixa.nome || faixa.titulo}" não pertence ao estilo do programa "${programaAtual.nome}" (${estiloProg}). Escolha uma música compatível para ir ao ar!`,
+			});
+			return;
+		}
+
 		setFaixaSelecionada({
 			arquivo: faixa.arquivo || faixa.url || "",
 			titulo: faixa.nome || faixa.titulo || "Música",
+			genero: faixa.genero || generoAtivo || "",
 		});
 		setCatalogoAberto(false);
 	};
@@ -140,7 +212,9 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 				setNotificacao({
 					icone: "✅",
 					titulo: "Pedido Recebido!",
-					mensagem: `Show de bola! A faixa "${faixaSelecionada.titulo}" entrou na fila da programação.`,
+					mensagem:
+						data?.mensagem ||
+						`Show de bola! A faixa "${faixaSelecionada.titulo}" entrou na fila da programação.`,
 				});
 			} else {
 				setNotificacao({
@@ -160,6 +234,8 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 		}
 	};
 
+	const pedidosBloqueados = programaAtual && programaAtual.permite_pedidos === false;
+
 	return (
 		<>
 			<Modal
@@ -171,51 +247,86 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 				footer={
 					<div className={styles.modalFooterActions}>
 						<Button variant="outline" intent="neutral" onClick={onClose}>
-							Voltar
+							{pedidosBloqueados ? "Compreendi" : "Voltar"}
 						</Button>
-						<Button
-							variant="filled"
-							intent="primary"
-							onClick={handleEnviarPedido}
-							disabled={enviando}
-						>
-							{enviando ? "Enviando..." : "Enviar Pedido"}
-						</Button>
+						{!pedidosBloqueados && (
+							<Button
+								variant="filled"
+								intent="primary"
+								onClick={handleEnviarPedido}
+								disabled={enviando}
+							>
+								{enviando ? "Enviando..." : "Enviar Pedido"}
+							</Button>
+						)}
 					</div>
 				}
 			>
-				<div className={styles.pedidoFormStack}>
-					<Input
-						label="Seu Nome / Apelido (Obrigatório)"
-						placeholder="Ex: Carlos do Centro"
-						value={nome}
-						onValueChange={setNome}
-					/>
-					<Input
-						label="Recado / Alô (Opcional)"
-						placeholder="Ex: Manda um alô pra galera!"
-						value={recado}
-						onValueChange={setRecado}
-					/>
-					<div className={styles.seletorAcervoField}>
-						<span className={styles.seletorAcervoLabel}>
-							Música Escolhida (Obrigatório)
-						</span>
-						<button
-							type="button"
-							className={
-								faixaSelecionada
-									? `${styles.btnSeletorAcervo} ${styles.selecionado}`
-									: styles.btnSeletorAcervo
-							}
-							onClick={abrirCatalogo}
-						>
-							{faixaSelecionada
-								? `✓ ${faixaSelecionada.titulo}`
-								: "🔍 Toque para Escolher a Música"}
-						</button>
+				{pedidosBloqueados ? (
+					<div className={styles.avisoBloqueioPedidos}>
+						<div className={styles.avisoIcone}>🔒</div>
+						<h3 className={styles.avisoTitulo}>Pedidos Fechados Neste Horário</h3>
+						<p className={styles.avisoTexto}>
+							O programa <strong>{programaAtual?.nome || "atual"}</strong> conta com uma curadoria musical exclusiva da Flash FM e não recebe pedidos de ouvintes.
+						</p>
+						{proximoPrograma && (
+							<div className={styles.avisoHorarioVolta}>
+								📻 Os pedidos voltam no programa <strong>{proximoPrograma.nome}</strong>{proximoPrograma.horario ? ` (${proximoPrograma.horario})` : ""}!
+							</div>
+						)}
 					</div>
-				</div>
+				) : (
+					<div className={styles.pedidoFormStack}>
+						{programaAtual && (
+							<div className={styles.bannerProgramaPedido}>
+								<span className={styles.bannerProgramaIcone}>
+									{programaAtual.icone || "📻"}
+								</span>
+								<div className={styles.bannerProgramaTextos}>
+									<div className={styles.bannerProgramaNome}>
+										{programaAtual.nome}
+									</div>
+									{programaAtual.generos_prioritarios?.length > 0 && (
+										<div className={styles.bannerProgramaEstilo}>
+											Estilo aceito: <strong>{programaAtual.generos_prioritarios.join(", ")}</strong>
+										</div>
+									)}
+								</div>
+							</div>
+						)}
+
+						<Input
+							label="Seu Nome / Apelido (Obrigatório)"
+							placeholder="Ex: Carlos do Centro"
+							value={nome}
+							onValueChange={setNome}
+						/>
+						<Input
+							label="Recado / Alô (Opcional)"
+							placeholder="Ex: Manda um alô pra galera!"
+							value={recado}
+							onValueChange={setRecado}
+						/>
+						<div className={styles.seletorAcervoField}>
+							<span className={styles.seletorAcervoLabel}>
+								Música Escolhida (Obrigatório)
+							</span>
+							<button
+								type="button"
+								className={
+									faixaSelecionada
+										? `${styles.btnSeletorAcervo} ${styles.selecionado}`
+										: styles.btnSeletorAcervo
+								}
+								onClick={abrirCatalogo}
+							>
+								{faixaSelecionada
+									? `✓ ${faixaSelecionada.titulo}`
+									: "🔍 Toque para Escolher a Música"}
+							</button>
+						</div>
+					</div>
+				)}
 			</Modal>
 
 			{/* Sub-Modal: Navegação do Acervo por Gênero e Busca */}
@@ -259,6 +370,7 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 								) : (
 									faixasGlobaisFiltradas.map((f) => {
 										const nomeFaixa = f.nome || f.titulo || "Música";
+										const combina = faixaCombinaComPrograma(f);
 										return (
 											<button
 												key={f.id || f.arquivo || nomeFaixa}
@@ -270,6 +382,7 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 													justifyContent: "space-between",
 													alignItems: "center",
 													gap: "8px",
+													opacity: combina ? 1 : 0.65,
 												}}
 											>
 												<span
@@ -279,10 +392,11 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 														whiteSpace: "nowrap",
 													}}
 												>
-													🎵 {nomeFaixa}
+													{combina ? "⭐ " : "🎵 "}
+													{nomeFaixa}
 												</span>
 												<span className={styles.badgeGeneroOuvinte}>
-													{f.genero}
+													{combina ? "No Estilo" : f.genero}
 												</span>
 											</button>
 										);
@@ -300,22 +414,39 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 										Nenhum gênero disponível.
 									</div>
 								) : (
-									Object.entries(mapaGeneros).map(([genero, faixas]) => (
-										<button
-											key={genero}
-											type="button"
-											className={styles.cardGenBtn}
-											onClick={() => {
-												setGeneroAtivo(genero);
-												setBuscaFaixa("");
-											}}
-										>
-											<span>📁 {genero}</span>
-											<Badge intent="primary" variant="subtle">
-												{faixas.length}
-											</Badge>
-										</button>
-									))
+									Object.entries(mapaGeneros).map(([genero, faixas]) => {
+										const combina = generoCombinaComPrograma(genero);
+										return (
+											<button
+												key={genero}
+												type="button"
+												className={
+													combina
+														? `${styles.cardGenBtn} ${styles.cardGenBtnDestaque}`
+														: styles.cardGenBtn
+												}
+												onClick={() => {
+													setGeneroAtivo(genero);
+													setBuscaFaixa("");
+												}}
+											>
+												<div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+													<span>
+														{combina ? "⭐ " : "📁 "}
+														{genero}
+													</span>
+													{combina && (
+														<span className={styles.tagEstiloPrograma}>
+															Estilo do programa
+														</span>
+													)}
+												</div>
+												<Badge intent={combina ? "primary" : "neutral"} variant="subtle">
+													{faixas.length}
+												</Badge>
+											</button>
+										);
+									})
 								)}
 							</div>
 						)}
@@ -377,4 +508,3 @@ export const SongRequestModal = ({ isOpen, onClose, initialSong = null }) => {
 		</>
 	);
 };
-

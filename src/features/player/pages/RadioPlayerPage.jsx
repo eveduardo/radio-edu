@@ -363,6 +363,8 @@ const RadioPlayerContent = () => {
 					setFaixaInicialPedido(null);
 				}}
 				initialSong={faixaInicialPedido}
+				programaAtual={programaAtual}
+				proximoPrograma={proximoPrograma}
 			/>
 
 			<ShareModal
