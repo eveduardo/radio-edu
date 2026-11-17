@@ -48,6 +48,7 @@ const RadioPlayerContent = () => {
 		volumeMaster,
 		recolhido,
 		programaAtual,
+		proximoPrograma,
 		playerRef,
 		playerDeckBRef,
 		audioCtxRef,
@@ -78,7 +79,7 @@ const RadioPlayerContent = () => {
 			return false;
 		}
 		return favoritas.some(
-			(f) => f.titulo.toLowerCase() === tituloMusica.toLowerCase(),
+			(f) => (f?.titulo || "").toLowerCase() === tituloMusica.toLowerCase(),
 		);
 	}, [favoritas, tituloMusica]);
 
@@ -93,7 +94,7 @@ const RadioPlayerContent = () => {
 		if (ehFavoritoAtual) {
 			salvarFavoritas(
 				favoritas.filter(
-					(f) => f.titulo.toLowerCase() !== tituloMusica.toLowerCase(),
+					(f) => (f?.titulo || "").toLowerCase() !== tituloMusica.toLowerCase(),
 				),
 			);
 		} else {
