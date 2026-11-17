@@ -314,12 +314,22 @@ const RadioPlayerContent = () => {
 
 					<div className={styles.controlsRow}>
 						<Button
-							intent="primary"
+							intent={programaAtual?.permite_pedidos === false ? "neutral" : "primary"}
 							variant="filled"
 							className={styles.btnPedirMusica}
-							onClick={() => setModalPedidoAberto(true)}
+							disabled={programaAtual?.permite_pedidos === false}
+							onClick={() => {
+								if (programaAtual?.permite_pedidos !== false) {
+									setModalPedidoAberto(true);
+								}
+							}}
+							title={
+								programaAtual?.permite_pedidos === false
+									? `O programa "${programaAtual.nome}" possui programação exclusiva e não aceita pedidos de ouvintes.${proximoPrograma ? ` Voltam no programa ${proximoPrograma.nome} (${proximoPrograma.horario || ""}).` : ""}`
+									: "Pedir música na programação"
+							}
 						>
-							🎵 Pedir Música
+							{programaAtual?.permite_pedidos === false ? "🔒 Pedidos Pausados" : "🎵 Pedir Música"}
 						</Button>
 
 						<div className={styles.volumeContainer}>
