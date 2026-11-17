@@ -69,10 +69,19 @@ export const SongRequestModal = ({
 		return matchPasta;
 	};
 
-	const generoCombinaComPrograma = (generoNome) => {
+	const generoCombinaComPrograma = (generoNome, faixas = []) => {
 		if (generosDoPrograma.length === 0 && pastasDoPrograma.length === 0) {
 			return true;
 		}
+
+		// 1. Verifica pela pasta física das faixas (ex: musicas/rock_classico/...)
+		const exemploArq = faixas?.[0]?.arquivo || faixas?.[0]?.url || "";
+		const partes = exemploArq.split("/");
+		const pastaReal = (partes.length > 2 && partes[0] === "musicas") ? partes[1].toLowerCase().replace(/[-_ ]/g, "") : "";
+		if (pastaReal && pastasDoPrograma.some((pm) => pm === pastaReal || pastaReal.includes(pm) || pm.includes(pastaReal))) {
+			return true;
+		}
+
 		const genNorm = generoNome.toLowerCase().trim().replace(/[_-]/g, " ");
 		const matchGen = generosDoPrograma.some(
 			(gp) => genNorm.includes(gp) || gp.includes(genNorm),
@@ -84,6 +93,15 @@ export const SongRequestModal = ({
 			(pm) => genSemEspaco.includes(pm) || pm.includes(genSemEspaco),
 		);
 	};
+
+	// Filtra as pastas/gêneros que pertencem exclusivamente ao programa no ar
+	const generosPermitidos = useMemo(() => {
+		const entries = Object.entries(mapaGeneros);
+		if (!programaAtual) return entries;
+		return entries.filter(([genero, faixas]) =>
+			generoCombinaComPrograma(genero, faixas),
+		);
+	}, [mapaGeneros, programaAtual, generosDoPrograma, pastasDoPrograma]);
 
 	useEffect(() => {
 		if (isOpen) {
@@ -132,7 +150,7 @@ export const SongRequestModal = ({
 		const t = buscaAcervoGlobal.toLowerCase().trim();
 		if (t.length < 2) return [];
 		const todas = [];
-		for (const [gen, faixas] of Object.entries(mapaGeneros)) {
+		for (const [gen, faixas] of generosPermitidos) {
 			if (Array.isArray(faixas)) {
 				for (const f of faixas) {
 					todas.push({ ...f, genero: f.genero || gen });
@@ -147,7 +165,7 @@ export const SongRequestModal = ({
 				return n.includes(t) || a.includes(t) || g.includes(t);
 			})
 			.slice(0, 50);
-	}, [buscaAcervoGlobal, mapaGeneros]);
+	}, [buscaAcervoGlobal, generosPermitidos]);
 
 	const faixasFiltradas = useMemo(() => {
 		if (!generoAtivo) return [];
@@ -336,7 +354,9 @@ export const SongRequestModal = ({
 				title={
 					generoAtivo
 						? `📁 ${generoAtivo} (${(mapaGeneros[generoAtivo] || []).length})`
-						: "📁 Acervo Musical"
+						: programaAtual
+							? `📁 Pastas do Programa: ${programaAtual.nome}`
+							: "📁 Pastas de Músicas"
 				}
 				size="sm"
 				closeLabel="Fechar catálogo"
@@ -348,7 +368,7 @@ export const SongRequestModal = ({
 							isFullWidth
 							onClick={() => setGeneroAtivo(null)}
 						>
-							← Voltar aos Gêneros
+							← Voltar às Pastas
 						</Button>
 					) : undefined
 				}
@@ -370,7 +390,6 @@ export const SongRequestModal = ({
 								) : (
 									faixasGlobaisFiltradas.map((f) => {
 										const nomeFaixa = f.nome || f.titulo || "Música";
-										const combina = faixaCombinaComPrograma(f);
 										return (
 											<button
 												key={f.id || f.arquivo || nomeFaixa}
@@ -382,7 +401,6 @@ export const SongRequestModal = ({
 													justifyContent: "space-between",
 													alignItems: "center",
 													gap: "8px",
-													opacity: combina ? 1 : 0.65,
 												}}
 											>
 												<span
@@ -392,11 +410,10 @@ export const SongRequestModal = ({
 														whiteSpace: "nowrap",
 													}}
 												>
-													{combina ? "⭐ " : "🎵 "}
-													{nomeFaixa}
+													🎵 {nomeFaixa}
 												</span>
 												<span className={styles.badgeGeneroOuvinte}>
-													{combina ? "No Estilo" : f.genero}
+													{f.genero}
 												</span>
 											</button>
 										);
@@ -407,46 +424,33 @@ export const SongRequestModal = ({
 							<div className={styles.gridGenerosOuvinte}>
 								{carregandoAcervo ? (
 									<div className={styles.emptyCatalogMsg}>
-										Carregando acervo...
+										Carregando pastas...
 									</div>
-								) : Object.keys(mapaGeneros).length === 0 ? (
+								) : generosPermitidos.length === 0 ? (
 									<div className={styles.emptyCatalogMsg}>
-										Nenhum gênero disponível.
+										{programaAtual
+											? `O programa "${programaAtual.nome}" possui programação exclusiva e não possui pastas liberadas para pedidos no momento.`
+											: "Nenhuma pasta disponível."}
 									</div>
 								) : (
-									Object.entries(mapaGeneros).map(([genero, faixas]) => {
-										const combina = generoCombinaComPrograma(genero);
-										return (
-											<button
-												key={genero}
-												type="button"
-												className={
-													combina
-														? `${styles.cardGenBtn} ${styles.cardGenBtnDestaque}`
-														: styles.cardGenBtn
-												}
-												onClick={() => {
-													setGeneroAtivo(genero);
-													setBuscaFaixa("");
-												}}
-											>
-												<div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-													<span>
-														{combina ? "⭐ " : "📁 "}
-														{genero}
-													</span>
-													{combina && (
-														<span className={styles.tagEstiloPrograma}>
-															Estilo do programa
-														</span>
-													)}
-												</div>
-												<Badge intent={combina ? "primary" : "neutral"} variant="subtle">
-													{faixas.length}
-												</Badge>
-											</button>
-										);
-									})
+									generosPermitidos.map(([genero, faixas]) => (
+										<button
+											key={genero}
+											type="button"
+											className={styles.cardGenBtn}
+											onClick={() => {
+												setGeneroAtivo(genero);
+												setBuscaFaixa("");
+											}}
+										>
+											<div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+												<span>📁 {genero}</span>
+											</div>
+											<Badge intent="neutral" variant="subtle">
+												{faixas.length}
+											</Badge>
+										</button>
+									))
 								)}
 							</div>
 						)}
