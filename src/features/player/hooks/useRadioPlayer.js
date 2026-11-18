@@ -577,14 +577,15 @@ export const useRadioPlayer = () => {
 					deckAtivo &&
 					deckAtivo.src;
 
-				// Se um áudio especial da IA ou vinheta já estiver tocando no deck, NUNCA o reinicia
+				// Se este MESMO áudio especial já estiver tocando no deck, não o reinicia do zero.
+				// Mas se o servidor trocou para OUTRO áudio especial (ex.: da vinheta prefixo para a voz do recado),
+				// DEVE carregar e reproduzir a nova faixa imediatamente!
 				const jaTocandoEspecial =
 					ehAudioEspecialIaOuVinheta(novaUrl) &&
 					deckAtivo &&
 					deckAtivo.src &&
 					!deckAtivo.paused &&
-					(deckSrcNorm === novaUrlNorm ||
-						ehAudioEspecialIaOuVinheta(deckAtivo.src));
+					deckSrcNorm === novaUrlNorm;
 
 				if (
 					deckAtivo &&
